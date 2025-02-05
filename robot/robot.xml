@@ -1,0 +1,221 @@
+<mujoco model="onshape">
+  <default>
+    <joint damping="1.084" armature="0.045" frictionloss="0.03" />
+    <geom condim="4" contype="1" conaffinity="15" friction="0.9 0.2 0.2" solref="0.001 2"/>
+    <position kp="21.1" ctrlrange="-3.141592 3.141592" forcerange="-3 3"/>
+    <!-- <motor ctrllimited="auto" /> -->
+    <equality solref="0.001 2" />
+    <default class="visualgeom">
+      <geom material="visualgeom" condim="1" contype="0" conaffinity="0" />
+    </default>
+  </default>
+
+  <compiler angle="radian" meshdir="meshes" eulerseq="zyx" autolimits="true" />
+
+  <asset>
+    <texture name="texplane" type="2d" builtin="checker" rgb1=".0 .0 .0" rgb2=".8 .8 .8" width="100" height="100" />
+    <material name="matplane" reflectance="0." texture="texplane" texrepeat="1 1" texuniform="true" />
+    <material name="arm_pitch_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="torso_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="neck_yaw_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="hip_pitch_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="arm_roll_right_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="arm_connector_right_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="elbow_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="arm_roll_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="arm_connector_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="neck_pitch_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="camera_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="part_1_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="hip_yaw_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="knee_hip_connector_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="knee_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="ankle_pitch_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="feet_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="hip_roll_material" rgba="0.61568627450980395466 0.81176470588235294379 0.92941176470588238168 1.0" />
+    <material name="default_material" rgba="0.7 0.7 0.7 1" />
+    <mesh name="arm_pitch.stl" file="arm_pitch.stl" />
+    <mesh name="torso.stl" file="torso.stl" />
+    <mesh name="neck_yaw.stl" file="neck_yaw.stl" />
+    <mesh name="hip_pitch.stl" file="hip_pitch.stl" />
+    <mesh name="arm_roll_right.stl" file="arm_roll_right.stl" />
+    <mesh name="arm_connector_right.stl" file="arm_connector_right.stl" />
+    <mesh name="elbow.stl" file="elbow.stl" />
+    <mesh name="arm_roll.stl" file="arm_roll.stl" />
+    <mesh name="arm_connector.stl" file="arm_connector.stl" />
+    <mesh name="neck_pitch.stl" file="neck_pitch.stl" />
+    <mesh name="camera.stl" file="camera.stl" />
+    <mesh name="part_1.stl" file="part_1.stl" />
+    <mesh name="hip_yaw.stl" file="hip_yaw.stl" />
+    <mesh name="knee_hip_connector.stl" file="knee_hip_connector.stl" />
+    <mesh name="knee.stl" file="knee.stl" />
+    <mesh name="ankle_pitch.stl" file="ankle_pitch.stl" />
+    <mesh name="feet.stl" file="feet.stl" />
+    <mesh name="hip_roll.stl" file="hip_roll.stl" />
+  </asset>
+
+  <worldbody>
+    <light directional="true" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" pos="0 0 5.0" dir="0 0 -1" castshadow="false" />
+    <light directional="true" diffuse="0.6 0.6 0.6" specular="0.2 0.2 0.2" pos="0 0 4" dir="0 0 -1" />
+    <geom name="ground" type="plane" pos="0 0 0" size="10 10 0.001" quat="1 0 0 0" material="matplane" condim="3" conaffinity="15" />
+    <body name="root" pos="0 0 0.22288997999999996" quat="1 0 0 0">
+      <freejoint name="root" />
+      <site name="root_site" pos="0 0 0" quat="1 0 0 0" />
+      <body name="torso" pos="0 0 0" quat="1 0 0 0">
+        <inertial pos="-3.7022483872835717735e-17 0.049013245062467639124 0.061076268675456742152" quat="1.0 0.0 0.0 0.0" mass="1.604816123528635563" diaginertia="0.0029708353578182627 0.005467446423313853 0.004608868567744083" />
+        <geom name="torso_collision_0" pos="0.038199999999999928457 0.05300224999999994524 0.12166519000000003414" quat="1.0 0.0 0.0 0.0" type="mesh" mesh="arm_pitch.stl" rgba="0 0 0 0" />
+        <geom name="torso_collision_1" pos="-2.7755575615628913511e-17 0.045502049999999988339 0" quat="1.0 0.0 0.0 0.0" type="mesh" mesh="torso.stl" rgba="0 0 0 0" />
+        <geom name="torso_collision_2" pos="-0.03820000000000003948 0.053002249999999931362 0.12166519000000000639" quat="3.749399456654644e-33 6.123233995736766e-17 1.0 6.123233995736766e-17" type="mesh" mesh="arm_pitch.stl" rgba="0 0 0 0" />
+        <geom name="torso_collision_3" pos="-5.5511151231257827021e-17 0.036400210000000002286 0.10930518999999999652" quat="1.0 0.0 0.0 0.0" type="mesh" mesh="neck_yaw.stl" rgba="0 0 0 0" />
+        <geom name="torso_collision_4" pos="0.0081999999999999712008 0.054199970000000000092 -0.012359999999999989051" quat="1.0 -7.67237273762409e-17 -0.0 0.0" type="mesh" mesh="hip_pitch.stl" rgba="0 0 0 0" />
+        <geom name="torso_collision_5" pos="-0.0082000000000000544675 0.054199969999999972337 -0.012360000000000002929" quat="3.749399456654644e-33 6.123233995736766e-17 1.0 6.123233995736766e-17" type="mesh" mesh="hip_pitch.stl" rgba="0 0 0 0" />
+        <geom name="torso_visual_0" pos="0.038199999999999928457 0.05300224999999994524 0.12166519000000003414" quat="1.0 0.0 0.0 0.0" material="arm_pitch_material" type="mesh" mesh="arm_pitch.stl" />
+        <geom name="torso_visual_1" pos="-2.7755575615628913511e-17 0.045502049999999988339 0" quat="1.0 0.0 0.0 0.0" material="torso_material" type="mesh" mesh="torso.stl" />
+        <geom name="torso_visual_2" pos="-0.03820000000000003948 0.053002249999999931362 0.12166519000000000639" quat="3.749399456654644e-33 6.123233995736766e-17 1.0 6.123233995736766e-17" material="arm_pitch_material" type="mesh" mesh="arm_pitch.stl" />
+        <geom name="torso_visual_3" pos="-5.5511151231257827021e-17 0.036400210000000002286 0.10930518999999999652" quat="1.0 0.0 0.0 0.0" material="neck_yaw_material" type="mesh" mesh="neck_yaw.stl" />
+        <geom name="torso_visual_4" pos="0.0081999999999999712008 0.054199970000000000092 -0.012359999999999989051" quat="1.0 -7.67237273762409e-17 -0.0 0.0" material="hip_pitch_material" type="mesh" mesh="hip_pitch.stl" />
+        <geom name="torso_visual_5" pos="-0.0082000000000000544675 0.054199969999999972337 -0.012360000000000002929" quat="3.749399456654644e-33 6.123233995736766e-17 1.0 6.123233995736766e-17" material="hip_pitch_material" type="mesh" mesh="hip_pitch.stl" />
+        <body name="arm_roll_right" pos="-0.070850000000000037947 0.040502249999999927199 0.12166519000000000639" quat="0.5000000000000001 0.5 0.49999999999999983 0.5">
+          <joint name="right_shoulder_pitch" type="hinge" axis="0 0 -1" />
+          <inertial pos="2.3846992074336762049e-05 -0.003044952722950133861 -0.038860581164318078184" quat="1.0 0.0 0.0 0.0" mass="0.074284128952064418239" diaginertia="3.155432970772893e-05 3.3900958076048805e-05 1.671809508965768e-05" />
+          <geom name="arm_roll_right_collision_0" pos="-6.9388939039072283776e-18 -0.01235999999999999599 -0.03567431499999999811" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="arm_roll_right.stl" rgba="0 0 0 0" />
+          <geom name="arm_roll_right_visual_0" pos="-6.9388939039072283776e-18 -0.01235999999999999599 -0.03567431499999999811" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="arm_roll_right_material" type="mesh" mesh="arm_roll_right.stl" />
+          <body name="arm_connector_right" pos="-0.01465197000000000721 -0.019062990000000001878 -0.056598629999999996998" quat="4.329780281177467e-17 -0.7071067811865476 -4.329780281177466e-17 -0.7071067811865475">
+            <joint name="right_shoulder_roll" type="hinge" axis="0 0 -1" />
+            <inertial pos="-0.0062715824515591376762 0.02082405177048708006 0.0068346953424079006506" quat="1.0 0.0 0.0 0.0" mass="0.013804448279315588433" diaginertia="3.2977095276869168e-06 3.052007488360969e-06 3.2640909535537456e-06" />
+            <geom name="arm_connector_right_collision_0" pos="0 0 -0.0050000000000000009714" quat="0.7071067811865476 0.7071067811865475 -9.415855026610148e-49 9.415855026610147e-49" type="mesh" mesh="arm_connector_right.stl" rgba="0 0 0 0" />
+            <geom name="arm_connector_right_visual_0" pos="0 0 -0.0050000000000000009714" quat="0.7071067811865476 0.7071067811865475 -9.415855026610148e-49 9.415855026610147e-49" material="arm_connector_right_material" type="mesh" mesh="arm_connector_right.stl" />
+            <body name="elbow" pos="-0.013325000000000003508 0.039999999999999993894 0.014324999999999990519" quat="4.329780281177467e-17 0.7071067811865476 4.329780281177466e-17 -0.7071067811865475">
+              <joint name="right_elbow" type="hinge" axis="0 0 -1" />
+              <inertial pos="1.3305143185178535457e-18 -0.04651408986213597524 -0.013840252712837298674" quat="1.0 0.0 0.0 0.0" mass="0.11054057778322769201" diaginertia="0.00013108439479087315 1.824891895795823e-05 0.00012410383166627824" />
+              <geom name="elbow_collision_0" pos="0 -0.088110000000000021636 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="elbow.stl" rgba="0 0 0 0" />
+              <geom name="elbow_visual_0" pos="0 -0.088110000000000021636 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="elbow_material" type="mesh" mesh="elbow.stl" />
+            </body>
+          </body>
+        </body>
+        <body name="arm_roll" pos="0.070849999999999926925 0.040502249999999941077 0.12166519000000003414" quat="0.5000000000000001 -0.5 -0.4999999999999999 0.5">
+          <joint name="left_shoulder_pitch" type="hinge" axis="0 0 1" />
+          <inertial pos="2.3846992074344456496e-05 0.0030449527229501321263 -0.038860581164318071246" quat="1.0 0.0 0.0 0.0" mass="0.074284128952064432116" diaginertia="3.155432970772893e-05 3.3900958076048805e-05 1.671809508965768e-05" />
+          <geom name="arm_roll_collision_0" pos="0 0.01235999999999999599 -0.03567431499999999811" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" type="mesh" mesh="arm_roll.stl" rgba="0 0 0 0" />
+          <geom name="arm_roll_visual_0" pos="0 0.01235999999999999599 -0.03567431499999999811" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" material="arm_roll_material" type="mesh" mesh="arm_roll.stl" />
+          <body name="arm_connector" pos="-0.014651969999999993333 0.019062989999999988 -0.056598629999999996998" quat="0.7071067811865476 -0.0 0.7071067811865475 0.0">
+            <joint name="left_shoulder_roll" type="hinge" axis="0 0 1" />
+            <inertial pos="0.0062715824515591342067 0.020824051770487083529 0.0068346953424078989159" quat="1.0 0.0 0.0 0.0" mass="0.013804448279315581494" diaginertia="3.2977095276869155e-06 3.052007488360967e-06 3.2640909535537443e-06" />
+            <geom name="arm_connector_collision_0" pos="0 0 -0.0050000000000000009714" quat="0.7071067811865476 0.7071067811865475 0.0 0.0" type="mesh" mesh="arm_connector.stl" rgba="0 0 0 0" />
+            <geom name="arm_connector_visual_0" pos="0 0 -0.0050000000000000009714" quat="0.7071067811865476 0.7071067811865475 0.0 0.0" material="arm_connector_material" type="mesh" mesh="arm_connector.stl" />
+            <body name="elbow_2" pos="0.013325000000000003508 0.040000000000000007772 0.014325000000000004396" quat="4.329780281177467e-17 -0.7071067811865476 -4.329780281177466e-17 -0.7071067811865475">
+              <joint name="left_elbow" type="hinge" axis="0 0 1" />
+              <inertial pos="1.3305143185178535457e-18 -0.046514089862135968301 -0.013840252712837298674" quat="1.0 0.0 0.0 0.0" mass="0.11054057778322769201" diaginertia="0.00013108439479087315 1.824891895795823e-05 0.00012410383166627824" />
+              <geom name="elbow_2_collision_0" pos="0 -0.088110000000000007758 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="elbow.stl" rgba="0 0 0 0" />
+              <geom name="elbow_2_visual_0" pos="0 -0.088110000000000007758 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="elbow_material" type="mesh" mesh="elbow.stl" />
+            </body>
+          </body>
+        </body>
+        <body name="neck_pitch" pos="-5.5511151231257827021e-17 0.023900209999999998123 0.12860520000000000285" quat="6.123233995736766e-17 1.0 0.0 0.0">
+          <joint name="head_yaw" type="hinge" axis="0 0 1" />
+          <inertial pos="-3.8081064448691748225e-05 -0.0093979230839891063354 -0.017325336317445198808" quat="1.0 0.0 0.0 0.0" mass="0.044275119779519978014" diaginertia="9.815064469746306e-06 7.479876467131593e-06 1.2740065759890871e-05" />
+          <geom name="neck_pitch_collision_0" pos="-0.018825000000000025741 -0.0093906699999999967976 -0.017360000000000014309" quat="6.123233995736766e-17 1.0 0.0 0.0" type="mesh" mesh="neck_pitch.stl" rgba="0 0 0 0" />
+          <geom name="neck_pitch_visual_0" pos="-0.018825000000000025741 -0.0093906699999999967976 -0.017360000000000014309" quat="6.123233995736766e-17 1.0 0.0 0.0" material="neck_pitch_material" type="mesh" mesh="neck_pitch.stl" />
+          <body name="camera" pos="0.013824999999999965788 0.0031093300000000073657 -0.017360000000000014309" quat="0.5000000000000001 0.49999999999999994 -0.49999999999999994 -0.49999999999999994">
+            <joint name="head_pitch" type="hinge" axis="0 0 1" />
+            <inertial pos="5.5646337774053955424e-54 -0.028193381532648852106 0.013807352396023634192" quat="1.0 0.0 0.0 0.0" mass="0.095539524348764226502" diaginertia="0.00011736851422394061 0.00011234889560054791 1.6523966493062412e-05" />
+            <geom name="camera_collision_0" pos="0.013500000000000001582 -0.030499999999999999334 0.013824999999999993544" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" type="mesh" mesh="camera.stl" rgba="0 0 0 0" />
+            <geom name="camera_visual_0" pos="0.013500000000000001582 -0.030499999999999999334 0.013824999999999993544" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" material="camera_material" type="mesh" mesh="camera.stl" />
+          </body>
+        </body>
+        <body name="part_1" pos="-0.040850000000000052935 0.041699969999999968173 -0.01235999999999999599" quat="0.5000000000000001 0.5 0.4999999999999999 0.5">
+          <joint name="right_hip_pitch" type="hinge" axis="0 0 -1" />
+          <inertial pos="-0.0089809342944587432916 2.1674505067501015354e-05 -0.021592443941690239034" quat="1.0 0.0 0.0 0.0" mass="0.059562985501351084494" diaginertia="1.566061599191106e-05 1.2543716294935516e-05 1.71503153173621e-05" />
+          <geom name="part_1_collision_0" pos="-0.0090248899999999937505 -0.022610000000000005094 -0.021627814999999994683" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="part_1.stl" rgba="0 0 0 0" />
+          <geom name="part_1_visual_0" pos="-0.0090248899999999937505 -0.022610000000000005094 -0.021627814999999994683" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="part_1_material" type="mesh" mesh="part_1.stl" />
+          <body name="hip_yaw" pos="-0.022849889999999987295 -0.012500000000000004163 -0.022898999999999988808" quat="4.329780281177467e-17 -0.7071067811865476 -4.329780281177466e-17 -0.7071067811865475">
+            <joint name="right_hip_roll" type="hinge" axis="0 0 -1" />
+            <inertial pos="1.3704125172074432119e-17 0.035725321790722401605 0.021655385352294762025" quat="1.0 0.0 0.0 0.0" mass="0.061443350158479730083" diaginertia="3.072166911650504e-05 1.770586950372161e-05 1.9235017194972874e-05" />
+            <geom name="hip_yaw_collision_0" pos="1.3877787807814456755e-17 0.062449979999999995217 0.024502800000000001662" quat="0.7071067811865476 0.7071067811865475 0.0 0.0" type="mesh" mesh="hip_yaw.stl" rgba="0 0 0 0" />
+            <geom name="hip_yaw_visual_0" pos="1.3877787807814456755e-17 0.062449979999999995217 0.024502800000000001662" quat="0.7071067811865476 0.7071067811865475 0.0 0.0" material="hip_yaw_material" type="mesh" mesh="hip_yaw.stl" />
+            <body name="knee_hip_connector" pos="-1.3877787807814456755e-17 0.057449979999999990776 0.012002799999999997499" quat="4.329780281177467e-17 -4.329780281177466e-17 -0.7071067811865475 0.7071067811865476">
+              <joint name="right_hip_yaw" type="hinge" axis="0 0 -1" />
+              <inertial pos="0.012355824367816485229 -4.5743758868432850286e-19 -0.016327850096648170025" quat="1.0 0.0 0.0 0.0" mass="0.010094408194960852176" diaginertia="1.3722342858736314e-06 2.0396387822108784e-06 1.2545966401404397e-06" />
+              <geom name="knee_hip_connector_collision_0" pos="0 0 -0.015109999999999998432" quat="1.0 0.0 0.0 0.0" type="mesh" mesh="knee_hip_connector.stl" rgba="0 0 0 0" />
+              <geom name="knee_hip_connector_visual_0" pos="0 0 -0.015109999999999998432" quat="1.0 0.0 0.0 0.0" material="knee_hip_connector_material" type="mesh" mesh="knee_hip_connector.stl" />
+              <body name="shin" pos="0.013049499999999991662 1.0408340855860842566e-17 -0.034359999999999987774" quat="0.5000000000000001 0.5 0.4999999999999999 0.5">
+                <joint name="right_knee" type="hinge" axis="0 0 -1" />
+                <inertial pos="-2.5610643071885378804e-19 -0.038109999999999998044 -0.013860790149757070897" quat="1.0 0.0 0.0 0.0" mass="0.094218308738066483543" diaginertia="8.398276340195e-05 1.5906607997904013e-05 7.769234282754984e-05" />
+                <geom name="shin_collision_0" pos="6.9388939039072283776e-18 -0.038110000000000004983 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="knee.stl" rgba="0 0 0 0" />
+                <geom name="shin_collision_1" pos="6.9388939039072283776e-18 -0.086329999999999990079 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="ankle_pitch.stl" rgba="0 0 0 0" />
+                <geom name="shin_visual_0" pos="6.9388939039072283776e-18 -0.038110000000000004983 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="knee_material" type="mesh" mesh="knee.stl" />
+                <geom name="shin_visual_1" pos="6.9388939039072283776e-18 -0.086329999999999990079 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="ankle_pitch_material" type="mesh" mesh="ankle_pitch.stl" />
+                <body name="feet" pos="0 -0.07621999999999998221 0" quat="6.123233995736766e-17 -1.0 7.547468613682779e-49 1.232595164407831e-32">
+                  <joint name="right_ankle_pitch" type="hinge" axis="0 0 -1" />
+                  <inertial pos="2.4065128818169668723e-17 0.024077118863380524844 0.016553739061179448266" quat="1.0 0.0 0.0 0.0" mass="0.086230150028128074724" diaginertia="2.9777680269156784e-05 0.0001430601373025348 0.00011808239944558669" />
+                  <geom name="feet_collision_0" pos="1.3877787807814456755e-17 0.02999999999999999889 0.017824999999999986688" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" type="mesh" mesh="feet.stl" rgba="0 0 0 0" />
+                  <geom name="feet_visual_0" pos="1.3877787807814456755e-17 0.02999999999999999889 0.017824999999999986688" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" material="feet_material" type="mesh" mesh="feet.stl" />
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+        <body name="hip_roll" pos="0.040849999999999969669 0.041699969999999995929 -0.01235999999999999252" quat="0.5000000000000001 -0.5 -0.49999999999999983 0.5">
+          <joint name="left_hip_pitch" type="hinge" axis="0 0 1" />
+          <inertial pos="-0.0089809342944587415569 -2.1674505067504484801e-05 -0.021592443941690239034" quat="1.0 0.0 0.0 0.0" mass="0.059562985501351077555" diaginertia="1.5660615991911063e-05 1.2543716294935517e-05 1.7150315317362102e-05" />
+          <geom name="hip_roll_collision_0" pos="-0.0090248899999999937505 0.022610000000000001624 -0.021627814999999994683" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" type="mesh" mesh="hip_roll.stl" rgba="0 0 0 0" />
+          <geom name="hip_roll_visual_0" pos="-0.0090248899999999937505 0.022610000000000001624 -0.021627814999999994683" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" material="hip_roll_material" type="mesh" mesh="hip_roll.stl" />
+          <body name="hip_yaw_2" pos="-0.022849889999999997703 0.012500000000000004163 -0.022899000000000002686" quat="0.7071067811865476 -0.0 0.7071067811865475 0.0">
+            <joint name="left_hip_roll" type="hinge" axis="0 0 1" />
+            <inertial pos="1.3704125172074432119e-17 0.035725321790722408544 0.021655385352294758555" quat="1.0 0.0 0.0 0.0" mass="0.061443350158479730083" diaginertia="3.072166911650504e-05 1.770586950372161e-05 1.9235017194972874e-05" />
+            <geom name="hip_yaw_2_collision_0" pos="1.3877787807814456755e-17 0.062449980000000002156 0.024502799999999998193" quat="0.7071067811865476 0.7071067811865475 -1.7369985357701723e-48 1.736998535770172e-48" type="mesh" mesh="hip_yaw.stl" rgba="0 0 0 0" />
+            <geom name="hip_yaw_2_visual_0" pos="1.3877787807814456755e-17 0.062449980000000002156 0.024502799999999998193" quat="0.7071067811865476 0.7071067811865475 -1.7369985357701723e-48 1.736998535770172e-48" material="hip_yaw_material" type="mesh" mesh="hip_yaw.stl" />
+            <body name="knee_hip_connector_2" pos="0 0.057449979999999997715 0.012002799999999994029" quat="0.7071067811865476 0.7071067811865475 -1.7369985357701723e-48 1.736998535770172e-48">
+              <joint name="left_hip_yaw" type="hinge" axis="0 0 1" />
+              <inertial pos="0.012355824367816485229 -3.9268845406379424028e-18 -0.016327850096648170025" quat="1.0 0.0 0.0 0.0" mass="0.010094408194960852176" diaginertia="1.3722342858736314e-06 2.0396387822108784e-06 1.2545966401404397e-06" />
+              <geom name="knee_hip_connector_2_collision_0" pos="0 -3.4694469519536141888e-18 -0.015109999999999998432" quat="1.0 0.0 0.0 2.4564868871083853e-48" type="mesh" mesh="knee_hip_connector.stl" rgba="0 0 0 0" />
+              <geom name="knee_hip_connector_2_visual_0" pos="0 -3.4694469519536141888e-18 -0.015109999999999998432" quat="1.0 0.0 0.0 2.4564868871083853e-48" material="knee_hip_connector_material" type="mesh" mesh="knee_hip_connector.stl" />
+              <body name="shin_2" pos="0.013049499999999991662 0 -0.034359999999999987774" quat="0.5000000000000001 0.5 0.4999999999999999 0.5">
+                <joint name="left_knee" type="hinge" axis="0 0 1" />
+                <inertial pos="-2.5610643071885378804e-19 -0.038109999999999998044 -0.013860790149757070897" quat="1.0 0.0 0.0 0.0" mass="0.094218308738066483543" diaginertia="8.398276340195e-05 1.5906607997904013e-05 7.769234282754984e-05" />
+                <geom name="shin_2_collision_0" pos="6.9388939039072283776e-18 -0.038110000000000004983 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="knee.stl" rgba="0 0 0 0" />
+                <geom name="shin_2_collision_1" pos="6.9388939039072283776e-18 -0.086329999999999990079 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="ankle_pitch.stl" rgba="0 0 0 0" />
+                <geom name="shin_2_visual_0" pos="6.9388939039072283776e-18 -0.038110000000000004983 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="knee_material" type="mesh" mesh="knee.stl" />
+                <geom name="shin_2_visual_1" pos="6.9388939039072283776e-18 -0.086329999999999990079 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="ankle_pitch_material" type="mesh" mesh="ankle_pitch.stl" />
+                <body name="feet_2" pos="0 -0.07621999999999998221 0" quat="6.123233995736766e-17 1.0 7.54746861368278e-49 -1.2325951644078312e-32">
+                  <joint name="left_ankle_pitch" type="hinge" axis="0 0 1" />
+                  <inertial pos="2.0595681866216054535e-17 0.024077118863380524844 0.016553739061179462144" quat="1.0 0.0 0.0 0.0" mass="0.086230150028128074724" diaginertia="2.9777680269156784e-05 0.0001430601373025348 0.00011808239944558669" />
+                  <geom name="feet_2_collision_0" pos="1.0408340855860842566e-17 0.02999999999999999889 0.017825000000000000566" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" type="mesh" mesh="feet.stl" rgba="0 0 0 0" />
+                  <geom name="feet_2_visual_0" pos="1.0408340855860842566e-17 0.02999999999999999889 0.017825000000000000566" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" material="feet_material" type="mesh" mesh="feet.stl" />
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="right_shoulder_pitch_ctrl" joint="right_shoulder_pitch" forcelimited="true" />
+    <position name="right_shoulder_roll_ctrl" joint="right_shoulder_roll" forcelimited="true" />
+    <position name="right_elbow_ctrl" joint="right_elbow" forcelimited="true" />
+    <position name="left_shoulder_pitch_ctrl" joint="left_shoulder_pitch" forcelimited="true" />
+    <position name="left_shoulder_roll_ctrl" joint="left_shoulder_roll" forcelimited="true" />
+    <position name="left_elbow_ctrl" joint="left_elbow" forcelimited="true" />
+    <position name="head_yaw_ctrl" joint="head_yaw" forcelimited="true" />
+    <position name="head_pitch_ctrl" joint="head_pitch" forcelimited="true" />
+    <position name="right_hip_pitch_ctrl" joint="right_hip_pitch" forcelimited="true" />
+    <position name="right_hip_roll_ctrl" joint="right_hip_roll" forcelimited="true" />
+    <position name="right_hip_yaw_ctrl" joint="right_hip_yaw" forcelimited="true" />
+    <position name="right_knee_ctrl" joint="right_knee" forcelimited="true" />
+    <position name="right_ankle_pitch_ctrl" joint="right_ankle_pitch" forcelimited="true" />
+    <position name="left_hip_pitch_ctrl" joint="left_hip_pitch" forcelimited="true" />
+    <position name="left_hip_roll_ctrl" joint="left_hip_roll" forcelimited="true" />
+    <position name="left_hip_yaw_ctrl" joint="left_hip_yaw" forcelimited="true" />
+    <position name="left_knee_ctrl" joint="left_knee" forcelimited="true" />
+    <position name="left_ankle_pitch_ctrl" joint="left_ankle_pitch" forcelimited="true" />
+  </actuator>
+
+  <sensor>
+    <framepos name="base_link_pos" objtype="site" objname="root_site" />
+    <framequat name="base_link_quat" objtype="site" objname="root_site" />
+    <framelinvel name="base_link_vel" objtype="site" objname="root_site" />
+    <frameangvel name="base_link_ang_vel" objtype="site" objname="root_site" />
+  </sensor>
+</mujoco>

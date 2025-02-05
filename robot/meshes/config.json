@@ -1,0 +1,10 @@
+{
+    "onshape_api": "https://cad.onshape.com",
+    "onshape_access_key": "W8trZBoEw8FmUIXfHHTjES6Z",
+    "onshape_secret_key": "8qR5RsSK6rly2tEP1cm8nW92JmI53j8wQkOitTHZEocx82Ku",
+
+    "documentId": "fb3325b2e47b2f8cc97c299e",
+    "assemblyName": "urdf",
+    "outputFormat": "urdf",
+    "robotname": "dagoat"
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<robot name="robot">
+
+    <group_state name="standing" group="all">
+
+        <joint name="right_shoulder_pitch"  value="0" />
+        <joint name="right_shoulder_roll"   value="0" />
+        <joint name="right_elbow"           value="0" />
+        <joint name="left_shoulder_pitch"   value="0" />
+        <joint name="left_shoulder_roll"    value="0" />
+        <joint name="left_elbow"            value="0" />
+        <joint name="head_yaw"              value="0" />
+        <joint name="head_pitch"            value="0" />
+        <joint name="right_hip_pitch"       value="0" />
+        <joint name="right_hip_roll"        value="0" />
+        <joint name="right_hip_yaw"         value="0" />
+        <joint name="right_knee"            value="0" />
+        <joint name="right_ankle_pitch"     value="0" />
+        <joint name="left_hip_pitch"        value="0" />
+        <joint name="left_hip_roll"         value="0" />
+        <joint name="left_hip_yaw"          value="0" />
+        <joint name="left_knee"             value="0" />
+        <joint name="left_ankle_pitch"      value="0" />
+    </group_state>
+</robot>
