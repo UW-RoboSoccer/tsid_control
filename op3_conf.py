@@ -39,8 +39,8 @@ contactNormal = np.array(
     [0.0, 0.0, 1.0]
 )  # direction of the normal to the contact surface
 
-rf_frame_name = 'right_ankle_pitch'
-lf_frame_name = 'left_ankle_pitch'
+rf_frame_name = 'leg_right_sole_joint_fixed'
+lf_frame_name = 'leg_left_sole_joint_fixed'
 
 urdf = './robot/robot.urdf'
 srdf = './robot/robot.srdf'

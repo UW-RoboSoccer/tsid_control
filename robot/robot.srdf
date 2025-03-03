@@ -2,7 +2,7 @@
 <robot name="robot">
 
     <group_state name="standing" group="all">
-
+        <joint name="root_joint" value="0. 0. 0.2228 0. 0. 0. 1." />
         <joint name="right_shoulder_pitch"  value="0" />
         <joint name="right_shoulder_roll"   value="0" />
         <joint name="right_elbow"           value="0" />

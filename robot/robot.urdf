@@ -483,6 +483,21 @@
 </inertial>
 </link>
 
+<link name="feet_sole">
+<inertial>
+<mass value="0.01" />
+<inertia ixx="0.0001" ixy="0"  ixz="0" iyy="0.0001" iyz="0"  izz="0.0001" />
+</inertial>
+</link>
+
+<joint name="leg_right_sole_joint_fixed" type="fixed">
+<origin xyz="0 0 -0.015" rpy="0 0 0" />
+<axis xyz="1 0 0"/>
+<dynamics damping="0.0" friction="0.0"/>
+<parent link="feet" />
+<child link="feet_sole" />
+</joint>
+
 <joint name="right_ankle_pitch" type="revolute">
 <origin xyz="0 -0.07621999999999998221 0" rpy="-3.141592653589793116 2.4651903288156618919e-32 0" />
 <parent link="shin" />
@@ -657,6 +672,21 @@
 <inertia ixx="2.977768026915678394e-05" ixy="-7.0635320883284654602e-22"  ixz="3.1422414234849689802e-20" iyy="0.00014306013730253479559" iyz="-1.9850263980091351355e-06" izz="0.00011808239944558668636" />
 </inertial>
 </link>
+
+<link name="feet_2_sole">
+<inertial>
+<mass value="0.01" />
+<inertia ixx="0.0001" ixy="0"  ixz="0" iyy="0.0001" iyz="0"  izz="0.0001" />
+</inertial>
+</link>
+
+<joint name="leg_left_sole_joint_fixed" type="fixed">
+<origin xyz="0 0 -0.015" rpy="0 0 0" />
+<axis xyz="1 0 0"/>
+<dynamics damping="0.0" friction="0.0"/>
+<parent link="feet_2" />
+<child link="feet_2_sole" />
+</joint>
 
 <joint name="left_ankle_pitch" type="revolute">
 <origin xyz="0 -0.07621999999999998221 0" rpy="3.141592653589793116 2.4651903288156624393e-32 0" />

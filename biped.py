@@ -97,7 +97,7 @@ class Biped:
         self.leftFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.leftFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
         self.trajLF = tsid.TrajectorySE3Constant("traj-left-foot", H_lf_ref)
-        # formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
+        formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
 
         self.rightFootTask = tsid.TaskSE3Equality(
             "task-right-foot", self.robot, self.conf.rf_frame_name
@@ -105,23 +105,23 @@ class Biped:
         self.rightFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.rightFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
         self.trajRF = tsid.TrajectorySE3Constant("traj-right-foot", H_rf_ref)
-        # formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
+        formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
 
         self.tau_max = conf.tau_max_scaling * robot.model().effortLimit[-robot.na :]
         self.tau_min = -self.tau_max
         actuationBoundsTask = tsid.TaskActuationBounds("task-actuation-bounds", robot)
         actuationBoundsTask.setBounds(self.tau_min, self.tau_max)
-        # if conf.w_torque_bounds > 0.0:
-        #     formulation.addActuationTask(
-        #         actuationBoundsTask, conf.w_torque_bounds, 0, 0.0
-        #     )
+        if conf.w_torque_bounds > 0.0:
+            formulation.addActuationTask(
+                actuationBoundsTask, conf.w_torque_bounds, 0, 0.0
+            )
 
         jointBoundsTask = tsid.TaskJointBounds("task-joint-bounds", robot, conf.dt)
         self.v_max = conf.v_max_scaling * robot.model().velocityLimit[-robot.na :]
         self.v_min = -self.v_max
         jointBoundsTask.setVelocityBounds(self.v_min, self.v_max)
-        # if conf.w_joint_bounds > 0.0:
-        #     formulation.addMotionTask(jointBoundsTask, conf.w_joint_bounds, 0, 0.0)
+        if conf.w_joint_bounds > 0.0:
+            formulation.addMotionTask(jointBoundsTask, conf.w_joint_bounds, 0, 0.0)
 
         com_ref = robot.com(data)
         self.trajCom = tsid.TrajectoryEuclidianConstant("traj_com", com_ref)

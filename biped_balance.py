@@ -36,6 +36,8 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
         HQPData = biped.formulation.computeProblemData(t, q, v)
 
+        print("com position: ", q[0:3])
+
         sol = biped.solver.solve(HQPData)
         if sol.status != 0:
             print("QP problem could not be solved! Error code:", sol.status)
