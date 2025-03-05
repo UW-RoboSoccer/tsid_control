@@ -10,20 +10,20 @@ w_contact = -1.0  # weight of foot in contact (negative means infinite weight)
 w_posture = 1e-1  # weight of joint posture task
 w_forceRef = 1e-5  # weight of force regularization task
 w_cop = 0.0
-w_torque_bounds = 1.0  # weight of the torque bounds
+w_torque_bounds = 0.0  # weight of the torque bounds
 w_joint_bounds = 0.0
 
-lxp = 0.065  # foot length in positive x direction
-lxn = 0.065 # foot length in negative x direction
-lyp = 0.03  # foot length in positive y direction
-lyn = 0.0  # foot length in negative y direction
-lz = 0.03  # foot sole height with respect to ankle joint
+lxp = 0.055  # foot length in positive x direction
+lxn = 0.055 # foot length in negative x direction
+lyp = 0.0275  # foot length in positive y direction
+lyn = 0.0275  # foot length in negative y direction
+lz = 0.0  # foot sole height with respect to ankle joint
 mu = 0.3  # friction coefficient
 fMin = 0.0  # minimum normal force
 fMax = 10000.0  # maximum normal force
 
-tau_max_scaling = 1.45  # scaling factor of torque bounds
-v_max_scaling = 0.8
+tau_max_scaling = 3  # scaling factor of torque bounds
+v_max_scaling = 1.0  # scaling factor of velocity bounds
 
 kp_contact = 10.0  # proportional gain of contact constraint
 kp_foot = 10.0  # proportional gain of contact constraint

@@ -50,6 +50,7 @@ class Biped:
         # modify initial robot configuration so that foot is on the ground (z=0)
         print("q[2]: ", q[2])
         q[2] -= H_rf_ref.translation[2] - conf.lz
+        print("H_rf_ref.translation[2]: ", H_rf_ref.translation[2])
         print("modified_q2", q[2])
         formulation.computeProblemData(0.0, q, v)
         data = formulation.data()

@@ -1,7 +1,7 @@
 <mujoco model="onshape">
   <default>
     <joint damping="1.084" armature="0.045" frictionloss="0.03" />
-    <geom condim="4" contype="1" conaffinity="15" friction="0.9 0.2 0.2" solref="0.001 2"/>
+    <geom condim="4" contype="1" conaffinity="15" friction="2 0.2 0.2" solref="0.001 2"/>
     <position kp="21.1" ctrlrange="-3.141592 3.141592" forcerange="-3 3"/>
     <!-- <motor ctrllimited="auto" /> -->
     <equality solref="0.001 2" />
