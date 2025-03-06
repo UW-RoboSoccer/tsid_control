@@ -54,7 +54,6 @@ def solve_capture_point(x_dot_0, tau_min_max, J, omega_0):
 
 #this provides one of the bounds of the capture region
 
-
 #To calcaulte the other boundary of the capture region, repeat with torque limit of tau_min and theta_min
 
 #TODO:: Check if omega_not is 0, different calculation if it is
