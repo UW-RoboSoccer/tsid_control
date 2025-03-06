@@ -54,6 +54,9 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
         HQPData = biped.formulation.computeProblemData(t, q, v)
 
+        print("com position: ", q[0:3])
+        print(mj_data.qpos[0:3])
+
         sol = biped.solver.solve(HQPData)
         if sol.status != 0:
             print("QP problem could not be solved! Error code:", sol.status)
@@ -61,7 +64,10 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
         # tau = biped.formulation.getActuatorForces(sol)
         dv = biped.formulation.getAccelerations(sol)
+        print('a:', dv)
         q, v = biped.integrate_dv(q, v, dv, conf.dt)
+        print('v:', v)
+        print('q:', q)
         i, t = i + 1, t + conf.dt
 
         com = biped.robot.com(biped.formulation.data())
