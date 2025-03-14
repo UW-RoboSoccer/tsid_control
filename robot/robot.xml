@@ -1,7 +1,7 @@
 <mujoco model="onshape">
   <default>
     <joint damping="1.084" armature="0.045" frictionloss="0.03" />
-    <geom condim="4" contype="1" conaffinity="15" friction="2 0.2 0.2" solref="0.001 2"/>
+    <geom condim="4" contype="1" conaffinity="15" friction="0.3 0.3 0.3" solref="0.001 2" margin="0.001"/>
     <position kp="21.1" ctrlrange="-3.141592 3.141592" forcerange="-3 3"/>
     <!-- <motor ctrllimited="auto" /> -->
     <equality solref="0.001 2" />
@@ -61,7 +61,7 @@
     <body name="root" pos="0 0 0.22288997999999996" quat="1 0 0 0">
       <freejoint name="root" />
       <site name="root_site" pos="0 0 0" quat="1 0 0 0" />
-      <body name="torso" pos="0 0 0" quat="1 0 0 0">
+      <body name="torso" pos="0 0 0" quat="0 0 0 1">
         <inertial pos="-3.7022483872835717735e-17 0.049013245062467639124 0.061076268675456742152" quat="1.0 0.0 0.0 0.0" mass="1.604816123528635563" diaginertia="0.0029708353578182627 0.005467446423313853 0.004608868567744083" />
         <geom name="torso_collision_0" pos="0.038199999999999928457 0.05300224999999994524 0.12166519000000003414" quat="1.0 0.0 0.0 0.0" type="mesh" mesh="arm_pitch.stl" rgba="0 0 0 0" />
         <geom name="torso_collision_1" pos="-2.7755575615628913511e-17 0.045502049999999988339 0" quat="1.0 0.0 0.0 0.0" type="mesh" mesh="torso.stl" rgba="0 0 0 0" />

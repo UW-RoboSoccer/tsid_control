@@ -17,8 +17,10 @@ mj_data = mujoco.MjData(mj_model)
 
 push_robot_active, push_robot_com_vel, com_vel_entry = True, np.array([0.0, 0.0, 0.0]), None
 
+com_0 = biped.robot.com(biped.formulation.data())
+
 starttime = time.time()
-amp = 0.5
+amp = 0.1
 freq = 0.1
 
 with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
@@ -31,57 +33,26 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
     HQPData = biped.formulation.computeProblemData(t, q, v)
     HQPData.print_all()
 
+    mj_data.qpos = q
+
+    print("Joint state: ", q)
+
     while viewer.is_running():
         # time_start = time.time()
-        t_elapsed = time.time() - starttime
-        com_offset_x = amp * np.sin(2 * np.pi * freq * t_elapsed)
+        # t_elapsed = time.time() - starttime
+        com_offset_x = amp * np.sin(2 * np.pi * freq * t)
 
         # Compute CoM reference and apply sinusoidal modification
-        sample_com = biped.trajCom.computeNext()
-        com_ref = sample_com.value()
-        com_ref[0] += com_offset_x  # Apply oscillation in x-direction
-        sample_com.value(com_ref)
-        print("CoM ref: ", com_ref)
-        biped.comTask.setReference(sample_com)
-
-        # Add reference geom to follow com ref
-        mujoco.mjv_initGeom(
-            viewer.user_scn.geoms[0],
-            type=mujoco.mjtGeom.mjGEOM_SPHERE,
-            size=[0.05, 0, 0],
-            pos=com_ref,
-            mat=np.eye(3).flatten(),
-            rgba=np.array([1.0, 0.0, 0.0, 1.0]),
+        biped.trajCom.setReference(
+            com_0 + np.array([0.0, com_offset_x, 0.0])
         )
 
-        mujoco.mjv_initGeom(
-            viewer.user_scn.geoms[1],
-            type=mujoco.mjtGeom.mjGEOM_SPHERE,
-            size=[0.05, 0, 0],
-            pos=q[0:3],
-            mat=np.eye(3).flatten(),
-            rgba=np.array([0.0, 1.0, 0.0, 1.0]),
-        )
-
-        mujoco.mjv_initGeom(
-            viewer.user_scn.geoms[2],
-            type=mujoco.mjtGeom.mjGEOM_SPHERE,
-            size=[0.05, 0, 0],
-            pos=mj_data.qpos[0:3],
-            mat=np.eye(3).flatten(),
-            rgba=np.array([0.0, 0.0, 1.0, 1.0]),
-        )
-
-        viewer.user_scn.ngeom = 3
-
+        biped.comTask.setReference(biped.trajCom.computeNext())
         biped.postureTask.setReference(biped.trajPosture.computeNext())
         biped.rightFootTask.setReference(biped.trajRF.computeNext())
         biped.leftFootTask.setReference(biped.trajLF.computeNext())
 
         HQPData = biped.formulation.computeProblemData(t, q, v)
-
-        print("com position: ", q[0:3])
-        print(mj_data.qpos[0:3])
 
         sol = biped.solver.solve(HQPData)
         if sol.status != 0:
@@ -92,6 +63,31 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         dv = biped.formulation.getAccelerations(sol)
         q, v = biped.integrate_dv(q, v, dv, conf.dt)
         i, t = i + 1, t + conf.dt
+
+        com = biped.robot.com(biped.formulation.data())
+        print("CoM: ", com)
+        print("CoM ref: ", biped.trajCom.getSample(t).value())
+
+        # Add reference geom to follow com ref
+        mujoco.mjv_initGeom(
+            viewer.user_scn.geoms[0],
+            type=mujoco.mjtGeom.mjGEOM_SPHERE,
+            size=[0.05, 0, 0],
+            pos=biped.trajCom.getSample(t).value(),
+            mat=np.eye(3).flatten(),
+            rgba=np.array([1.0, 0.0, 0.0, 1.0]),
+        )
+
+        mujoco.mjv_initGeom(
+            viewer.user_scn.geoms[1],
+            type=mujoco.mjtGeom.mjGEOM_SPHERE,
+            size=[0.05, 0, 0],
+            pos=com,
+            mat=np.eye(3).flatten(),
+            rgba=np.array([0.0, 1.0, 0.0, 1.0]),
+        )
+
+        viewer.user_scn.ngeom = 3
 
         ctrl = q[7:]
         mj_data.ctrl = ctrl

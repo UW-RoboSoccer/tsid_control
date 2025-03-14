@@ -48,13 +48,14 @@ class Biped:
         H_rf_ref = robot.framePosition(data, self.RF)
 
         # modify initial robot configuration so that foot is on the ground (z=0)
-        print("q[2]: ", q[2])
-        q[2] -= H_rf_ref.translation[2] - conf.lz
-        print("H_rf_ref.translation[2]: ", H_rf_ref.translation[2])
-        print("modified_q2", q[2])
-        formulation.computeProblemData(0.0, q, v)
+        # print("q[2]: ", q[2])
+        # q[2] -= H_rf_ref.translation[2] - conf.lz
+        # print("H_rf_ref.translation[2]: ", H_rf_ref.translation[2])
+        # print("modified_q2", q[2])
+        # formulation.computeProblemData(0.0, q, v)
         data = formulation.data()
         H_rf_ref = robot.framePosition(data, self.RF)
+        print("Right foot position: ", H_rf_ref)
         contactRF.setReference(H_rf_ref)
         if conf.w_contact >= 0.0:
             formulation.addRigidContact(contactRF, conf.w_forceRef, conf.w_contact, 1)
@@ -75,11 +76,22 @@ class Biped:
         contactLF.setKd(2.0 * np.sqrt(conf.kp_contact) * np.ones(6))
         self.LF = robot.model().getFrameId(conf.lf_frame_name)
         H_lf_ref = robot.framePosition(data, self.LF)
+        print("H_lf_ref.translation[2]: ", H_lf_ref.translation[2])
         contactLF.setReference(H_lf_ref)
         if conf.w_contact >= 0.0:
             formulation.addRigidContact(contactLF, conf.w_forceRef, conf.w_contact, 1)
         else:
             formulation.addRigidContact(contactLF, conf.w_forceRef)
+
+        copTask = tsid.TaskCopEquality("task-cop", robot)
+        formulation.addForceTask(copTask, conf.w_cop, 1, 0.0)
+
+        amTask = tsid.TaskAMEquality("task-am", robot)
+        amTask.setKp(conf.kp_am * np.array([1.0, 1.0, 0.0]))
+        amTask.setKd(2.0 * np.sqrt(conf.kp_am * np.array([1.0, 1.0, 0.0])))
+        formulation.addMotionTask(amTask, conf.w_am, 1, 0.0)
+        sampleAM = tsid.TrajectorySample(3)
+        amTask.setReference(sampleAM)
 
         comTask = tsid.TaskComEquality("task-com", robot)
         comTask.setKp(conf.kp_com * np.ones(3))
@@ -146,6 +158,8 @@ class Biped:
         self.solver.resize(formulation.nVar, formulation.nEq, formulation.nIn)
 
         self.comTask = comTask
+        self.amTask = amTask
+        self.copTask = copTask
         self.postureTask = postureTask
         self.contactRF = contactRF
         self.contactLF = contactLF
