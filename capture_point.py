@@ -20,7 +20,7 @@ def torque_profile(t, TR1, TR2):
         + tau_max * (t >= TR2)
     )
 
-def solve_TR2( tau_min_max ):
+def solve_TR2( tau_min_max, J, omega_0 ):
     a = tau_min_max / (4 * J)
     b = 0.5 * (omega_f + omega_0)
     c = omega_0 - omega_max - J/(4*tau_min_max) * (omega_f - omega_0)**2
@@ -39,21 +39,21 @@ def solve_TR2( tau_min_max ):
     else:
         return max(TR2_1, TR2_2)
 
-def solve_TR1(TR2):
+def solve_TR1(TR2, J, omega_0):
     return (
         0.5 * TR2 + J / (2 * tau_max) * (omega_f - omega_0)
     )
 
-def solve_x_0(x_dot_0, tau_min_max):
+def solve_capture_point(x_dot_0, tau_min_max, J, omega_0):
     TR2 = solve_TR2(tau_min_max)
-    TR1 = solve_TR1(TR2)
-    return (
+    TR1 = solve_TR1(TR2, J, omega_0)
+    return -1 * (
         (-1 / omega_nat)*x_dot_0 
         + (tau_max/(m*g)) * (math.exp(omega_nat*TR2) - 2*math.exp(omega_nat*(TR2-TR1))+1) / (math.exp(omega_nat*TR2))
     )
 
 #this provides one of the bounds of the capture region
-capture_point = -1 * solve_x_0(x_dot_0, tau_max)
+
 
 #To calcaulte the other boundary of the capture region, repeat with torque limit of tau_min and theta_min
 
@@ -67,3 +67,5 @@ capture_point = -1 * solve_x_0(x_dot_0, tau_max)
 #flywheel_ref = np.array([0, 0, tau_flywheel])
 # biped.flywheelTask.setReference(flywheel_ref)
 
+# size of q is 25
+# size of v and a is 24?
