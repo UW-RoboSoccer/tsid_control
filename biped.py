@@ -76,7 +76,7 @@ class Biped:
         contactLF.setKd(2.0 * np.sqrt(conf.kp_contact) * np.ones(6))
         self.LF = robot.model().getFrameId(conf.lf_frame_name)
         H_lf_ref = robot.framePosition(data, self.LF)
-        print("H_lf_ref.translation[2]: ", H_lf_ref.translation[2])
+        print("Left foot position: ", H_lf_ref)
         contactLF.setReference(H_lf_ref)
         if conf.w_contact >= 0.0:
             formulation.addRigidContact(contactLF, conf.w_forceRef, conf.w_contact, 1)

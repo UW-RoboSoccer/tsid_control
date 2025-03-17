@@ -19,7 +19,7 @@ lxp = 0.0275  # foot length in positive y direction
 lxn = 0.0275  # foot length in negative y direction
 lz = 0.0  # foot sole height with respect to ankle joint
 mu = 0.3  # friction coefficient
-fMin = 5.0  # minimum normal force
+fMin = 0.0  # minimum normal force
 fMax = 1000.0  # maximum normal force
 
 tau_max_scaling = 3.0  # scaling factor of torque bounds
@@ -27,13 +27,19 @@ v_max_scaling = 10.0  # scaling factor of velocity bounds
 
 kp_contact = 10.0  # proportional gain of contact constraint
 kp_foot = 10.0  # proportional gain of contact constraint
-kp_com = 21.0  # proportional gain of center of mass task
+kp_com = 10.0  # proportional gain of center of mass task
 kp_am = 10.0  # proportional gain of angular momentum task
-kp_posture = 10.0  # proportional gain of joint posture task
+kp_posture = 1.0  # proportional gain of joint posture task
 
 masks_posture = np.ones(18)
 
-gain_vector = np.ones(18)  # gain vector for postural task
+gain_vector = np.array([
+    100.0, 100.0, # head
+    10.0, 5.0, 5.0, 1.0, 1.0, # left leg
+    10.0, 10.0, 10.0, # left arm
+    10.0, 5.0, 5.0, 1.0, 1.0, # right leg
+    10.0, 10.0, 10.0 # right arm
+]) # gain vector for postural task
 
 contactNormal = np.array(
     [0.0, 0.0, 1.0]

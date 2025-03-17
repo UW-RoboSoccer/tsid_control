@@ -87,6 +87,15 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
             rgba=np.array([0.0, 1.0, 0.0, 1.0]),
         )
 
+        mujoco.mjv_initGeom(
+            viewer.user_scn.geoms[2],
+            type=mujoco.mjtGeom.mjGEOM_SPHERE,
+            size=[0.05, 0, 0],
+            pos=biped.trajLF.getSample(t).value()[:3],
+            mat=np.eye(3).flatten(),
+            rgba=np.array([0.0, 0.0, 1.0, 1.0]),
+        )
+
         viewer.user_scn.ngeom = 3
 
         ctrl = q[7:]
