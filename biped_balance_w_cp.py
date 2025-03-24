@@ -11,6 +11,34 @@ import numpy as np
 
 import pinocchio as pin
 
+def map_tsid_to_mujoco(q_tsid):
+    ctrl = np.zeros(18)
+    ctrl[0] = q_tsid[22] # right shoulder pitch
+    ctrl[1] = q_tsid[23] # right shoulder roll
+    ctrl[2] = q_tsid[24] # right elbow
+
+    ctrl[3] = q_tsid[14] # left shoulder pitch
+    ctrl[4] = q_tsid[15] # left shoulder roll
+    ctrl[5] = q_tsid[16] # left elbow
+
+    ctrl[6] = q_tsid[7] # head yaw
+    ctrl[7] = q_tsid[8] # head pitch
+
+    ctrl[8] = q_tsid[17] # right hip pitch
+    ctrl[9] = q_tsid[18] # right hip roll
+    ctrl[10] = q_tsid[19] # right hip yaw
+    ctrl[11] = q_tsid[20] # right knee
+    ctrl[12] = q_tsid[21] # right ankle pitch
+
+    ctrl[13] = q_tsid[9] # left hip pitch
+    ctrl[14] = q_tsid[10] # left hip roll
+    ctrl[15] = q_tsid[11] # left hip yaw
+    ctrl[16] = q_tsid[12] # left knee
+    ctrl[17] = q_tsid[13] # left ankle pitch
+
+    return ctrl
+
+
 biped = Biped(conf)
 
 mj_model = mujoco.MjModel.from_xml_path(conf.mujoco_model_path)
@@ -64,10 +92,10 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         # --- update CoM Reference --- #
         sample_com = biped.trajCom.computeNext()
         com_ref = sample_com.value()
-        # gain = 0.5
-        # com_ref[0] = (1-gain) * com_ref[0] + gain * capture_point_value
-        # sample_com.value(com_ref)
-        # biped.comTask.setReference(sample_com)
+        gain = 0
+        com_ref[0] = (1-gain) * com_ref[0] + gain * capture_point_value
+        sample_com.value(com_ref)
+        biped.comTask.setReference(sample_com)
         # print("Updated CoM ref: ", com_ref)
 
 
@@ -109,7 +137,7 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
         viewer.user_scn.ngeom = 4
 
-        biped.comTask.setReference(biped.trajCom.computeNext())
+        # biped.comTask.setReference(biped.trajCom.computeNext())
         biped.postureTask.setReference(biped.trajPosture.computeNext())
         biped.rightFootTask.setReference(biped.trajRF.computeNext())
         biped.leftFootTask.setReference(biped.trajLF.computeNext())
@@ -132,8 +160,11 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         # print('v:', v)
         # print('q:', q)
 
-        ctrl = q[7:]
-        mj_data.ctrl = ctrl
+        # ctrl = q[7:]
+
+        print('Joint Torques: ', mj_data.qfrc_smooth + mj_data.qfrc_constraint)
+
+        mj_data.ctrl = map_tsid_to_mujoco(q)
         mujoco.mj_step(mj_model, mj_data)
 
         current_time = time.time() - starttime
