@@ -18,7 +18,7 @@ lyn = 0.055 # foot length in negative x direction
 lxp = 0.0275  # foot length in positive y direction
 lxn = 0.0275  # foot length in negative y direction
 lz = 0.0  # foot sole height with respect to ankle joint
-mu = 0.3  # friction coefficient
+mu = 0.5  # friction coefficient
 fMin = 0.0  # minimum normal force
 fMax = 1000.0  # maximum normal force
 

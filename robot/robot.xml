@@ -3,7 +3,6 @@
     <joint damping="1.084" armature="0.045" frictionloss="0.03" />
     <geom condim="4" contype="1" conaffinity="15" friction="0.3 0.3 0.3" solref="0.001 2" margin="0.001"/>
     <position kp="21.1" ctrlrange="-3.141592 3.141592" forcerange="-3 3"/>
-    <!-- <motor ctrllimited="auto" /> -->
     <equality solref="0.001 2" />
     <default class="visualgeom">
       <geom material="visualgeom" condim="1" contype="0" conaffinity="0" />
@@ -124,29 +123,29 @@
           </body>
         </body>
         <body name="part_1" pos="-0.040850000000000052935 0.041699969999999968173 -0.01235999999999999599" quat="0.5000000000000001 0.5 0.4999999999999999 0.5">
-          <joint name="right_hip_pitch" type="hinge" axis="0 0 -1" />
+          <joint name="right_hip_pitch" type="hinge" axis="0 0 1" />
           <inertial pos="-0.0089809342944587432916 2.1674505067501015354e-05 -0.021592443941690239034" quat="1.0 0.0 0.0 0.0" mass="0.059562985501351084494" diaginertia="1.566061599191106e-05 1.2543716294935516e-05 1.71503153173621e-05" />
           <geom name="part_1_collision_0" pos="-0.0090248899999999937505 -0.022610000000000005094 -0.021627814999999994683" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="part_1.stl" rgba="0 0 0 0" />
           <geom name="part_1_visual_0" pos="-0.0090248899999999937505 -0.022610000000000005094 -0.021627814999999994683" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="part_1_material" type="mesh" mesh="part_1.stl" />
           <body name="hip_yaw" pos="-0.022849889999999987295 -0.012500000000000004163 -0.022898999999999988808" quat="4.329780281177467e-17 -0.7071067811865476 -4.329780281177466e-17 -0.7071067811865475">
-            <joint name="right_hip_roll" type="hinge" axis="0 0 -1" />
+            <joint name="right_hip_roll" type="hinge" axis="0 0 1" />
             <inertial pos="1.3704125172074432119e-17 0.035725321790722401605 0.021655385352294762025" quat="1.0 0.0 0.0 0.0" mass="0.061443350158479730083" diaginertia="3.072166911650504e-05 1.770586950372161e-05 1.9235017194972874e-05" />
             <geom name="hip_yaw_collision_0" pos="1.3877787807814456755e-17 0.062449979999999995217 0.024502800000000001662" quat="0.7071067811865476 0.7071067811865475 0.0 0.0" type="mesh" mesh="hip_yaw.stl" rgba="0 0 0 0" />
             <geom name="hip_yaw_visual_0" pos="1.3877787807814456755e-17 0.062449979999999995217 0.024502800000000001662" quat="0.7071067811865476 0.7071067811865475 0.0 0.0" material="hip_yaw_material" type="mesh" mesh="hip_yaw.stl" />
             <body name="knee_hip_connector" pos="-1.3877787807814456755e-17 0.057449979999999990776 0.012002799999999997499" quat="4.329780281177467e-17 -4.329780281177466e-17 -0.7071067811865475 0.7071067811865476">
-              <joint name="right_hip_yaw" type="hinge" axis="0 0 -1" />
+              <joint name="right_hip_yaw" type="hinge" axis="0 0 1" />
               <inertial pos="0.012355824367816485229 -4.5743758868432850286e-19 -0.016327850096648170025" quat="1.0 0.0 0.0 0.0" mass="0.010094408194960852176" diaginertia="1.3722342858736314e-06 2.0396387822108784e-06 1.2545966401404397e-06" />
               <geom name="knee_hip_connector_collision_0" pos="0 0 -0.015109999999999998432" quat="1.0 0.0 0.0 0.0" type="mesh" mesh="knee_hip_connector.stl" rgba="0 0 0 0" />
               <geom name="knee_hip_connector_visual_0" pos="0 0 -0.015109999999999998432" quat="1.0 0.0 0.0 0.0" material="knee_hip_connector_material" type="mesh" mesh="knee_hip_connector.stl" />
               <body name="shin" pos="0.013049499999999991662 1.0408340855860842566e-17 -0.034359999999999987774" quat="0.5000000000000001 0.5 0.4999999999999999 0.5">
-                <joint name="right_knee" type="hinge" axis="0 0 -1" />
+                <joint name="right_knee" type="hinge" axis="0 0 1" />
                 <inertial pos="-2.5610643071885378804e-19 -0.038109999999999998044 -0.013860790149757070897" quat="1.0 0.0 0.0 0.0" mass="0.094218308738066483543" diaginertia="8.398276340195e-05 1.5906607997904013e-05 7.769234282754984e-05" />
                 <geom name="shin_collision_0" pos="6.9388939039072283776e-18 -0.038110000000000004983 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="knee.stl" rgba="0 0 0 0" />
                 <geom name="shin_collision_1" pos="6.9388939039072283776e-18 -0.086329999999999990079 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" type="mesh" mesh="ankle_pitch.stl" rgba="0 0 0 0" />
                 <geom name="shin_visual_0" pos="6.9388939039072283776e-18 -0.038110000000000004983 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="knee_material" type="mesh" mesh="knee.stl" />
                 <geom name="shin_visual_1" pos="6.9388939039072283776e-18 -0.086329999999999990079 -0.013825000000000003952" quat="0.5000000000000001 -0.5 -0.5 -0.4999999999999999" material="ankle_pitch_material" type="mesh" mesh="ankle_pitch.stl" />
                 <body name="feet" pos="0 -0.07621999999999998221 0" quat="6.123233995736766e-17 -1.0 7.547468613682779e-49 1.232595164407831e-32">
-                  <joint name="right_ankle_pitch" type="hinge" axis="0 0 -1" />
+                  <joint name="right_ankle_pitch" type="hinge" axis="0 0 1" />
                   <inertial pos="2.4065128818169668723e-17 0.024077118863380524844 0.016553739061179448266" quat="1.0 0.0 0.0 0.0" mass="0.086230150028128074724" diaginertia="2.9777680269156784e-05 0.0001430601373025348 0.00011808239944558669" />
                   <geom name="feet_collision_0" pos="1.3877787807814456755e-17 0.02999999999999999889 0.017824999999999986688" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" type="mesh" mesh="feet.stl" rgba="0 0 0 0" />
                   <geom name="feet_visual_0" pos="1.3877787807814456755e-17 0.02999999999999999889 0.017824999999999986688" quat="0.5000000000000001 0.5 0.5 -0.4999999999999999" material="feet_material" type="mesh" mesh="feet.stl" />
