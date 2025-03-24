@@ -25,6 +25,8 @@ fMax = 1000.0  # maximum normal force
 g = 9.18 #gravity constant
 z_com = 0.22288998 #approx CoM height when upright
 
+tau_max = 2.914
+
 tau_max_scaling = 3.0  # scaling factor of torque bounds
 v_max_scaling = 10.0  # scaling factor of velocity bounds
 
