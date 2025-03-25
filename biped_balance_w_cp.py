@@ -11,6 +11,10 @@ import numpy as np
 
 import pinocchio as pin
 
+tsid_max_torque = 0.0
+mujoco_max_torque = 0.0
+
+
 def map_tsid_to_mujoco(q_tsid):
     ctrl = np.zeros(18)
     ctrl[0] = q_tsid[22] # right shoulder pitch
@@ -39,12 +43,19 @@ def map_tsid_to_mujoco(q_tsid):
     return ctrl
 
 
+def log_max_torque(ctrl, max_torque):
+    for i in range(len(ctrl)):
+        if abs(ctrl[i]) > abs(max_torque):
+            max_torque = ctrl[i]
+    return max_torque
+
+
 biped = Biped(conf)
 
 mj_model = mujoco.MjModel.from_xml_path(conf.mujoco_model_path)
 mj_data = mujoco.MjData(mj_model)
 
-push_robot_active, push_robot_com_vel, com_vel_entry = True, np.array([0.5, 0.0, 0.0]), None
+push_robot_active, push_robot_com_vel, com_vel_entry = True, np.array([0.45, 0, 0.0]), None
 
 com_0 = biped.robot.com(biped.formulation.data())
 
@@ -75,30 +86,29 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
     while viewer.is_running():
         t_elapsed = time.time() - starttime
-        # com_offset_x = amp * np.sin(2 * np.pi * freq * t_elapsed)
-
-        # sample_com = biped.trajCom.computeNext()
-        # com_ref = sample_com.value()
-        # com_ref[0] += com_offset_x
 
         # --- Capture Point Computation --- #
         x_dot_0 = v[0]
         omega_0 = 0
         theta_0 = 0
+        capture_point_value = x_dot_0 * np.sqrt(com_0[2]/conf.g)
+        # capture_point_value = capture_point.solve_capture_point(x_dot_0, tau_max, omega_0, theta_0, theta_max)
+        print('Calculated Capture Point Value: ', capture_point_value)
 
-        capture_point_value = capture_point.solve_capture_point(x_dot_0, tau_max, omega_0, theta_0, theta_max)
-        print("Calculated Capture Point = ", capture_point_value)
-        
-        # --- update CoM Reference --- #
-        sample_com = biped.trajCom.computeNext()
+        # --- update CoM Reference Trajectory and update comTask--- #
+        sample_com = biped.trajCom.computeNext() 
         com_ref = sample_com.value()
-        gain = 0
-        com_ref[0] = (1-gain) * com_ref[0] + gain * capture_point_value
-        sample_com.value(com_ref)
-        biped.comTask.setReference(sample_com)
+        com_ref[0] += capture_point_value
+        biped.trajCom.setReference(com_ref)
+
+        # gain = 0.5
+        # com_ref[0] = (1-gain) * com_ref[0] + gain * capture_point_value
+        # sample_com.value(com_ref)
+        biped.comTask.setReference(biped.trajCom.computeNext())
         # print("Updated CoM ref: ", com_ref)
 
 
+        #Visualize the com_ref as a red sphere
         mujoco.mjv_initGeom(
             viewer.user_scn.geoms[0],
             type=mujoco.mjtGeom.mjGEOM_SPHERE,
@@ -108,6 +118,7 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
             rgba=np.array([1.0, 0.0, 0.0, 1.0]),
         )
 
+        #Visualize the TSID COM position as a green sphere
         mujoco.mjv_initGeom(
             viewer.user_scn.geoms[1],
             type=mujoco.mjtGeom.mjGEOM_SPHERE,
@@ -117,6 +128,7 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
             rgba=np.array([0.0, 1.0, 0.0, 1.0]),
         )
 
+        #Visualize the mujoco COM position as blue sphere
         mujoco.mjv_initGeom(
             viewer.user_scn.geoms[2],
             type=mujoco.mjtGeom.mjGEOM_SPHERE,
@@ -125,7 +137,8 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
             mat=np.eye(3).flatten(),
             rgba=np.array([0.0, 0.0, 1.0, 1.0]),
         )
-
+        
+        #Visualize the mujoco CP as a red circle on the x-y plane
         mujoco.mjv_initGeom(
             viewer.user_scn.geoms[3],
             type=mujoco.mjtGeom.mjGEOM_CYLINDER,
@@ -137,15 +150,11 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
         viewer.user_scn.ngeom = 4
 
-        # biped.comTask.setReference(biped.trajCom.computeNext())
         biped.postureTask.setReference(biped.trajPosture.computeNext())
         biped.rightFootTask.setReference(biped.trajRF.computeNext())
         biped.leftFootTask.setReference(biped.trajLF.computeNext())
 
         HQPData = biped.formulation.computeProblemData(t, q, v)
-
-        # print("com position: ", q[0:3])
-        # print(mj_data.qpos[0:3])
 
         sol = biped.solver.solve(HQPData)
         if sol.status != 0:
@@ -156,13 +165,21 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         q, v = biped.integrate_dv(q, v, dv, conf.dt)
         i, t = i + 1, t + conf.dt
 
-        # print('a:', dv)
-        # print('v:', v)
-        # print('q:', q)
 
-        # ctrl = q[7:]
+        # --- Print the torques from TSID and MuJoCo for comparison --- #
+        # tau = biped.formulation.getActuatorForces(sol)
+        # print('TSID Torques:', tau)
+        # print('Joint Torques: ', mj_data.qfrc_smooth + mj_data.qfrc_constraint)
 
-        print('Joint Torques: ', mj_data.qfrc_smooth + mj_data.qfrc_constraint)
+        # --- Log the max torques observed to see if they violate the motor max torques --- #
+        # tsid_max_torque = log_max_torque(tau, tsid_max_torque)
+        # mujoco_max_torque = log_max_torque(mj_data.qfrc_smooth + mj_data.qfrc_constraint, mujoco_max_torque)
+        # print('TSID max_torque obs: ', tsid_max_torque)
+        # print('MuJoCo max_torque obs: ', mujoco_max_torque)
+
+        # if (tsid_max_torque > 3):
+        #     print('max torque passed, closing program')
+        #     # quit()
 
         mj_data.ctrl = map_tsid_to_mujoco(q)
         mujoco.mj_step(mj_model, mj_data)

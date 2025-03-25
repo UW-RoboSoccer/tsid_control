@@ -15,12 +15,10 @@ omega_f = 0 #need it to be 0 to solve for the capture region
 
 torso_id = biped.model.getBodyId("torso")
 torso_inertial = biped.model.inertias[torso_id]
-J = torso_inertial.inertia[1,1] #Flywheel inertia
+J = torso_inertial.inertia[1,1] #Set flywheel inertia as Jyy from the inertia matrix
 
 # x_dot_0 = #Initial CoM velocity
 # omega_0 = this value is based on te crrent value of the flywheel. not calculated
-
-
 
 
 def torque_profile(t, TR1, TR2):
@@ -71,16 +69,3 @@ def solve_capture_point(x_dot_0, tau_min_max, omega_0, theta_0, theta_max):
 #this provides one of the bounds of the capture region
 
 #To calcaulte the other boundary of the capture region, repeat with torque limit of tau_min and theta_min
-
-#TODO:: Check if omega_0 is 0, different calculation if it is
-
-#get com_ref from biped.trajCom.computeNext().value()
-#set com_ref[0] = capture_point
-#biped.comTask.setReference(com_ref)
-
-#tau_flywheel = torque_profile(t)
-#flywheel_ref = np.array([0, 0, tau_flywheel])
-# biped.flywheelTask.setReference(flywheel_ref)
-
-# size of q is 25
-# size of v and a is 24?
