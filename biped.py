@@ -47,15 +47,8 @@ class Biped:
         self.RF = robot.model().getFrameId(conf.rf_frame_name)
         H_rf_ref = robot.framePosition(data, self.RF)
 
-        # modify initial robot configuration so that foot is on the ground (z=0)
-        # print("q[2]: ", q[2])
-        # q[2] -= H_rf_ref.translation[2] - conf.lz
-        # print("H_rf_ref.translation[2]: ", H_rf_ref.translation[2])
-        # print("modified_q2", q[2])
-        # formulation.computeProblemData(0.0, q, v)
         data = formulation.data()
         H_rf_ref = robot.framePosition(data, self.RF)
-        print("Right foot position: ", H_rf_ref)
         contactRF.setReference(H_rf_ref)
         if conf.w_contact >= 0.0:
             formulation.addRigidContact(contactRF, conf.w_forceRef, conf.w_contact, 1)
@@ -171,6 +164,74 @@ class Biped:
 
         self.contact_LF_active = True
         self.contact_RF_active = True
+
+    def removeLeftFootContact(self):
+        if self.contact_LF_active:
+            H_lf_ref = self.robot.framePosition(self.formulation.data(), self.LF)
+            self.trajLF.setReference(H_lf_ref)
+            self.leftFootTask.setReference(self.trajLF.computeNext())
+
+            self.formulation.removeRigidContact(self.contactLF.name)
+            self.contact_LF_active = False
+
+    def removeRightFootContact(self):
+        if self.contact_RF_active:
+            H_rf_ref = self.robot.framePosition(self.formulation.data(), self.RF)
+            self.trajRF.setReference(H_rf_ref)
+            self.rightFootTask.setReference(self.trajRF.computeNext())
+
+            self.formulation.removeRigidContact(self.contactRF.name)
+            self.contact_RF_active = False
+
+    def addLeftFootContact(self):
+        if not self.contact_LF_active:
+            H_lf_ref = self.robot.framePosition(self.formulation.data(), self.LF)
+            self.contactLF.setReference(H_lf_ref)
+            if self.conf.w_contact >= 0.0:
+                self.formulation.addRigidContact(
+                    self.contactLF, self.conf.w_forceRef, self.conf.w_contact, 1
+                )
+            else:
+                self.formulation.addRigidContact(
+                    self.contactLF, self.conf.w_forceRef
+                )
+            self.contact_LF_active = True
+
+    def addRightFootContact(self):
+        if not self.contact_RF_active:
+            H_rf_ref = self.robot.framePosition(self.formulation.data(), self.RF)
+            self.contactRF.setReference(H_rf_ref)
+            if self.conf.w_contact >= 0.0:
+                self.formulation.addRigidContact(
+                    self.contactRF, self.conf.w_forceRef, self.conf.w_contact, 1
+                )
+            else:
+                self.formulation.addRigidContact(
+                    self.contactRF, self.conf.w_forceRef
+                )
+            self.contact_RF_active = True
+
+    def gen_footstep(self, pos, r_foot, steps, height):
+        pos0 = self.robot.framePosition(self.formulation.data(), self.RF if r_foot else self.LF).translation
+        x = np.linspace(pos0[0], pos[0], steps)
+        y = np.linspace(pos0[1], pos[1], steps)
+        z = [4 * height * (i / steps) * (1 - i / steps) for i in range(steps)]
+        traj = np.zeros((steps, 3))
+        traj[:, 0] = x
+        traj[:, 1] = y
+        traj[:, 2] = z
+
+    def compute_capture_point(self, com, dcom, w):
+        cp = com + dcom / w
+        cp[2] = 0
+        return cp
+    
+    def compute_support_polygon(self):
+        data = self.formulation.data()
+        rf_pos = self.robot.framePosition(data, self.RF).translation
+        lf_pos = self.robot.framePosition(data, self.LF).translation
+        support_polygon = np.array([lf_pos[:2], rf_pos[:2]])
+        return support_polygon
 
     def integrate_dv(self, q, v, dv, dt):
         v_mean = v + 0.5 * dt * dv
