@@ -7,27 +7,18 @@ class Controller:
         self.dt = conf.dt
         self.sim_time = conf.sim_time
         self.steps = int(self.sim_time / self.dt)
+        self.current_step = 0
         
         # Initialize state variables
-        self.state = np.zeros(4) # [x, y, dx, dy]
+        self.x = np.zeros(3) # [x, y, z] CoM
+        self.e = np.zeros(3) # [x, y, z] DCM
+        self.state = np.zeros(2) # [x, e]
         self.zmp = np.zeros(2)
-        self.capture_point = np.zeros(2)
-        self.support_polygon = np.zeros((2, 2))
         self.footstep_traj = []
-
-    def set_state(self, position, velocity):
-        self.state[0] = position[0]
-        self.state[1] = position[1]
-        self.state[2] = velocity[0]
-        self.state[3] = velocity[1]
-
-    def compute_capture_point(self):
-        # ξ = x + ẋ/ω
-        omega = np.sqrt(self.conf.g / self.conf.h)
-        self.capture_point = self.state[0:2] + self.state[2:4] / omega
-        return self.capture_point
+        self.dcm_traj = []
         
     def gen_footsteps(self, traj):
+        self.current_step = 0
         footsteps = []
         dist = 0
         right_foot = True
@@ -74,3 +65,34 @@ class Controller:
                 HTM.append(T)
 
             footstep_traj.append(HTM)
+
+        self.footstep_traj = footstep_traj
+
+    def gen_dcm_traj(self, depth=3):
+        dcm_endpoints = []
+        vrp_pos = self.footstep_traj[depth-1][0][:3, 3]
+        dcm_end = vrp_pos
+
+        for i in range(depth-1, 0, -1):
+            vrp_pos = self.footstep_traj[i + self.current_step][0][:3, 3]
+            dcm_i = self.back_calc_dcm(vrp_pos, dcm_end)
+            dcm_end = dcm_i
+            dcm_endpoints.insert(0, dcm_i)
+
+        dcm_endpoints.append(dcm_end)
+
+        for i in range(depth-1):
+            dcm_i = dcm_endpoints[i]
+            dcm_end = dcm_endpoints[i + 1]
+
+            for j in range(int(self.conf.step_time / self.dt)):
+                t = j * self.dt
+                dcm_traj = self.footstep_traj[i + self.current_step][0][:3, 3] + (dcm_i - self.footstep_traj[i + self.current_step][0][:3, 3]) * np.exp(t / self.conf.tau)
+                self.dcm_traj.append(dcm_traj)
+
+        self.dcm_traj.append(dcm_endpoints[-1])
+
+    def back_calc_dcm(self, vrp_pos, dcm_end):
+        dcm_ini = np.zeros((3,))
+        dcm_ini = vrp_pos + (dcm_end - vrp_pos) * np.exp(-self.conf.step_time / self.conf.tau)
+        return dcm_ini
