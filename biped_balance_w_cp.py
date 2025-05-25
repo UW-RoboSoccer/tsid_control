@@ -1,7 +1,6 @@
 import mujoco.viewer
 from biped import Biped
 import op3_conf as conf
-import capture_point
 
 import mujoco
 
@@ -55,7 +54,7 @@ biped = Biped(conf)
 mj_model = mujoco.MjModel.from_xml_path(conf.mujoco_model_path)
 mj_data = mujoco.MjData(mj_model)
 
-push_robot_active, push_robot_com_vel, com_vel_entry = True, np.array([0.45, 0, 0.0]), None
+push_robot_active, push_robot_com_vel, com_vel_entry = True, np.array([0, 0.5, 0.0]), None
 
 com_0 = biped.robot.com(biped.formulation.data())
 
@@ -69,6 +68,8 @@ omega_f = 0
 
 theta_max = 90 * np.pi / 180
 
+torso_id = biped.model.getBodyId("torso")
+print(biped.model.inertias[torso_id].mass)
 
 with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
     viewer.sync()
@@ -89,16 +90,18 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
         # --- Capture Point Computation --- #
         x_dot_0 = v[0]
+        y_dot_0 = v[1]
         omega_0 = 0
         theta_0 = 0
-        capture_point_value = x_dot_0 * np.sqrt(com_0[2]/conf.g)
-        # capture_point_value = capture_point.solve_capture_point(x_dot_0, tau_max, omega_0, theta_0, theta_max)
-        print('Calculated Capture Point Value: ', capture_point_value)
+        capture_point_value_x = x_dot_0 * np.sqrt(com_0[2]/conf.g)
+        capture_point_value_y = y_dot_0 * np.sqrt(com_0[2]/conf.g)
+        print('Calculated Capture Point Value: (', capture_point_value_x, capture_point_value_y, ')')
 
         # --- update CoM Reference Trajectory and update comTask--- #
         sample_com = biped.trajCom.computeNext() 
         com_ref = sample_com.value()
-        com_ref[0] += capture_point_value
+        com_ref[0] = capture_point_value_x
+        com_ref[1] = capture_point_value_y
         biped.trajCom.setReference(com_ref)
 
         # gain = 0.5
@@ -143,12 +146,21 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
             viewer.user_scn.geoms[3],
             type=mujoco.mjtGeom.mjGEOM_CYLINDER,
             size=[0.025, 0.0001, 0],
-            pos=[capture_point_value, com_0[1], 0],
+            pos=[capture_point_value_x, 0, 0],
             mat=np.eye(3).flatten(),
             rgba=np.array([1, 0, 0, 1.0]),
         )
 
-        viewer.user_scn.ngeom = 4
+        mujoco.mjv_initGeom(
+            viewer.user_scn.geoms[4],
+            type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+            size=[0.025, 0.0001, 0],
+            pos=[0, capture_point_value_y, 0],
+            mat=np.eye(3).flatten(),
+            rgba=np.array([0, 1, 0, 1.0]),
+        )
+
+        viewer.user_scn.ngeom = 5
 
         biped.postureTask.setReference(biped.trajPosture.computeNext())
         biped.rightFootTask.setReference(biped.trajRF.computeNext())

@@ -15,8 +15,8 @@ class Biped:
         )
 
         robot = self.robot
-        self.model = robot.model()
-
+        self.model = robot.model()        
+        
         pin.loadReferenceConfigurations(self.model, conf.srdf, False)
         self.q0 = q = self.model.referenceConfigurations["standing"]
         v = np.zeros(robot.nv)

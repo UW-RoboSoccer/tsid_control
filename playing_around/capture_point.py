@@ -17,10 +17,6 @@ torso_id = biped.model.getBodyId("torso")
 torso_inertial = biped.model.inertias[torso_id]
 J = torso_inertial.inertia[1,1] #Set flywheel inertia as Jyy from the inertia matrix
 
-# x_dot_0 = #Initial CoM velocity
-# omega_0 = this value is based on te crrent value of the flywheel. not calculated
-
-
 def torque_profile(t, TR1, TR2):
     return (
         tau_max * (t >= 0)
