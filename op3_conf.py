@@ -1,12 +1,15 @@
 import numpy as np
 
-N_SIMULATION = 100000  # number of time steps simulated
+N_SIMULATION = 500  # number of time steps simulated
 dt = 0.002  # controller time step
+g = 9.81  # gravity
 
-step_length = 0.2  # length of the step
+z0 = 0.4  # initial height of the center of mass
+
+step_length = 0.1  # length of the step
 step_height = 0.05  # height of the step
 step_width = 0.1275  # width of the step
-step_time = 0.5  # time to complete the step
+step_time = 0.7  # time to complete the step
 
 w_com = 1.0  # weight of center of mass task
 w_am = 1e-3  # weight of angular momentum task

@@ -94,7 +94,9 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         t_elapsed = time.time() - start_time
 
         # Compute CoM reference and apply sinusoidal modification
-        com_offset_x = amp * np.sin(2 * np.pi * freq * t)
+        com_offset_x = amp * np.sin(2 * np.pi * freq * t) # motion
+
+        # Control
         biped.trajCom.setReference(
             com_0 + np.array([0.0, com_offset_x, 0.0])
         )
