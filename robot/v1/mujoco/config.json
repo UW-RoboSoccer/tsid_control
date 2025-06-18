@@ -1,0 +1,8 @@
+{
+    "url": "https://cad.onshape.com/documents/edea034631796554fe7de906/w/0725cd49d9878c86b643a14d/e/ef4419f73ceb4e549626bf9b",
+
+    "output_format": "mujoco",
+    "merge_stls": true,
+    "simplify_stls": "all",
+    "max_stl_size": 2
+}
