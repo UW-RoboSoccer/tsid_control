@@ -51,6 +51,9 @@
     <exclude body1="sts3250_3" body2="foot_2"/>
   </contact>
   <worldbody>
+    <!-- Ground plane -->
+    <geom name="ground" type="plane" pos="0 0 -0.2" quat="1 0 0 0" size="10 10 0.1" rgba="0.8 0.8 0.8 1" material="ground_material"/>
+    
     <!-- Link torso -->
     <body name="torso" pos="0 0 0" quat="1 0 0 0" childclass="C:\Users\David\desktop\v1_mujoco">
       <freejoint name="torso_freejoint"/>
@@ -325,6 +328,7 @@
     <material name="sts3250_6_collision_material" rgba="0.386349 0.417291 0.372244 1"/>
     <material name="camera_enclosure_visual_material" rgba="0.623322 0.771679 0.860693 1"/>
     <material name="camera_enclosure_collision_material" rgba="0.623322 0.771679 0.860693 1"/>
+    <material name="ground_material" rgba="0.8 0.8 0.8 1"/>
   </asset>
   <actuator>
     <position class="C:\Users\David\desktop\v1_mujoco" name="right_hip_yaw" joint="right_hip_yaw"/>

@@ -124,63 +124,64 @@ class FootstepPlanner:
 
         return footsteps
 
-# Example usage:
-planner = FootstepPlanner(step_width=0.2, step_length=0.3)
+if __name__ == "__main__":
+    # Example usage:
+    planner = FootstepPlanner(step_width=0.2, step_length=0.3)
 
-## Generate a simple path
-dt = 0.1
-t = np.linspace(0, 10, 100)
-v, w = 0.5, 0.1  # linear and angular velocity
-x, y = 0, 0  # initial position
-theta = 0  # initial orientation
-path = []
-for i in range(len(t)):
-    x += v * dt * np.cos(theta)
-    y += v * dt * np.sin(theta)
-    theta += w * dt
-    path.append(np.array([x, y]))
+    ## Generate a simple path
+    dt = 0.1
+    t = np.linspace(0, 10, 100)
+    v, w = 0.5, 0.1  # linear and angular velocity
+    x, y = 0, 0  # initial position
+    theta = 0  # initial orientation
+    path = []
+    for i in range(len(t)):
+        x += v * dt * np.cos(theta)
+        y += v * dt * np.sin(theta)
+        theta += w * dt
+        path.append(np.array([x, y]))
 
-# Initial supports (left and right foot)
-init_supports = [
-    Footstep(position=np.array([0, 0.1]), orientation=np.array([0, 0, 0]), side=0),  # Left foot
-    Footstep(position=np.array([0, -0.1]), orientation=np.array([0, 0, 0]), side=1)   # Right foot
-]
+    # Initial supports (left and right foot)
+    init_supports = [
+        Footstep(position=np.array([0, 0.1]), orientation=np.array([0, 0, 0]), side=0),  # Left foot
+        Footstep(position=np.array([0, -0.1]), orientation=np.array([0, 0, 0]), side=1)   # Right foot
+    ]
 
-# Plan footsteps along the path
-footsteps = planner.plan(path, init_supports)
+    # Plan footsteps along the path
+    footsteps = planner.plan(path, init_supports)
 
-# Plot the footsteps
-import matplotlib.pyplot as plt
-path = np.array(path)
-plt.figure(figsize=(10, 5))
-# Define footstep dimensions
-foot_length = 0.25  # length of the foot in meters
-foot_width = 0.1    # width of the foot in meters
+    # Plot the footsteps
+    import matplotlib.pyplot as plt
+    path = np.array(path)
+    plt.figure(figsize=(10, 5))
+    # Define footstep dimensions
+    foot_length = 0.25  # length of the foot in meters
+    foot_width = 0.1    # width of the foot in meters
 
-for footstep in footsteps:
-    # Create rectangle centered at footstep position with proper orientation
-    angle_rad = footstep.orientation[2]
-    
-    # Create a rotated rectangle using matplotlib patches
-    rect = plt.Rectangle(
-        footstep.transform([-foot_length/2, -foot_width/2]),  # centered at origin initially
-        foot_length, foot_width,
-        angle=np.degrees(angle_rad),
-        color='r' if footstep.side == 0 else 'b',
-        alpha=0.7,
-    )
-    plt.gca().add_patch(rect)
-    
-    # Add a small dot at the center for reference
-    plt.plot(footstep.position[0], footstep.position[1], 'ko', markersize=2)
-    
-# Plot the path
-plt.plot(path[:, 0], path[:, 1], 'g--', label='Planned Path')
+    for footstep in footsteps:
+        # Create rectangle centered at footstep position with proper orientation
+        angle_rad = footstep.orientation[2]
+        
+        # Create a rotated rectangle using matplotlib patches
+        rect = plt.Rectangle(
+            footstep.transform([-foot_length/2, -foot_width/2]),  # centered at origin initially
+            foot_length, foot_width,
+            angle=np.degrees(angle_rad),
+            color='r' if footstep.side == 0 else 'b',
+            alpha=0.7,
+        )
+        plt.gca().add_patch(rect)
+        
+        # Add a small dot at the center for reference
+        plt.plot(footstep.position[0], footstep.position[1], 'ko', markersize=2)
+        
+    # Plot the path
+    plt.plot(path[:, 0], path[:, 1], 'g--', label='Planned Path')
 
-plt.legend()
-plt.title('Planned Footsteps')
-plt.xlabel('X Position')
-plt.ylabel('Y Position')
-plt.axis('equal')
-plt.grid()
-plt.show()
+    plt.legend()
+    plt.title('Planned Footsteps')
+    plt.xlabel('X Position')
+    plt.ylabel('Y Position')
+    plt.axis('equal')
+    plt.grid()
+    plt.show()

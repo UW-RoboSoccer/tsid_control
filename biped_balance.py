@@ -1,6 +1,7 @@
 import mujoco.viewer
 from biped import Biped
 import op3_conf as conf
+import pinocchio as pin
 
 import mujoco
 
@@ -9,29 +10,37 @@ import time
 import numpy as np
 
 def map_tsid_to_mujoco(q_tsid):
-    ctrl = np.zeros(18)
-    ctrl[0] = q_tsid[22] # right shoulder pitch
-    ctrl[1] = q_tsid[23] # right shoulder roll
-    ctrl[2] = q_tsid[24] # right elbow
+    ctrl = np.zeros(20)
+    
+    # Right leg (actuators 0-5)
+    ctrl[0] = q_tsid[18] # right hip yaw
+    ctrl[1] = q_tsid[19] # right hip roll
+    ctrl[2] = q_tsid[20] # right hip pitch
+    ctrl[3] = q_tsid[21] # right knee
+    ctrl[4] = q_tsid[22] # right ankle pitch
+    ctrl[5] = q_tsid[23] # right ankle roll
 
-    ctrl[3] = q_tsid[14] # left shoulder pitch
-    ctrl[4] = q_tsid[15] # left shoulder roll
-    ctrl[5] = q_tsid[16] # left elbow
+    # Left leg (actuators 6-11)
+    ctrl[6] = q_tsid[9]  # left hip yaw
+    ctrl[7] = q_tsid[10] # left hip roll
+    ctrl[8] = q_tsid[11] # left hip pitch
+    ctrl[9] = q_tsid[12] # left knee
+    ctrl[10] = q_tsid[13] # left ankle pitch
+    ctrl[11] = q_tsid[14] # left ankle roll
 
-    ctrl[6] = q_tsid[7] # head yaw
-    ctrl[7] = q_tsid[8] # head pitch
+    # Left arm (actuators 12-14)
+    ctrl[12] = q_tsid[15] # left shoulder pitch
+    ctrl[13] = q_tsid[16] # left shoulder roll
+    ctrl[14] = q_tsid[17] # left elbow
 
-    ctrl[8] = q_tsid[17] # right hip pitch
-    ctrl[9] = q_tsid[18] # right hip roll
-    ctrl[10] = q_tsid[19] # right hip yaw
-    ctrl[11] = q_tsid[20] # right knee
-    ctrl[12] = q_tsid[21] # right ankle pitch
+    # Right arm (actuators 15-17)
+    ctrl[15] = q_tsid[24] # right shoulder pitch
+    ctrl[16] = q_tsid[25] # right shoulder roll
+    ctrl[17] = q_tsid[26] # right elbow
 
-    ctrl[13] = q_tsid[9] # left hip pitch
-    ctrl[14] = q_tsid[10] # left hip roll
-    ctrl[15] = q_tsid[11] # left hip yaw
-    ctrl[16] = q_tsid[12] # left knee
-    ctrl[17] = q_tsid[13] # left ankle pitch
+    # Head (actuators 18-19)
+    ctrl[18] = q_tsid[7]  # head yaw
+    ctrl[19] = q_tsid[8]  # head pitch
 
     return ctrl
 
@@ -128,8 +137,7 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
             start = i
             footstep = biped.gen_footstep(cp, True, conf.step_time/conf.dt, conf.step_height)
             biped.removeRightFootContact()
-
-            biped.trajRF.setReference(footstep[start - i])
+            biped.trajRF.setReference(pin.SE3(np.eye(3), footstep[start - i]))
 
         # Add reference geom to follow com ref
         mujoco.mjv_initGeom(

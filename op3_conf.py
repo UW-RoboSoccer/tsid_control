@@ -39,24 +39,24 @@ kp_com = 10.0  # proportional gain of center of mass task
 kp_am = 10.0  # proportional gain of angular momentum task
 kp_posture = 1.0  # proportional gain of joint posture task
 
-masks_posture = np.ones(18)
+masks_posture = np.ones(20)
 
 gain_vector = np.array([
-    100.0, 100.0, # head
-    10.0, 5.0, 5.0, 1.0, 1.0, # left leg
-    10.0, 10.0, 10.0, # left arm
-    10.0, 5.0, 5.0, 1.0, 1.0, # right leg
-    10.0, 10.0, 10.0 # right arm
+    100.0, 100.0, # head (2 joints)
+    10.0, 5.0, 5.0, 1.0, 1.0, 1.0, # left leg (6 joints: hip_yaw, hip_roll, hip_pitch, knee, ankle_pitch, ankle_roll)
+    10.0, 10.0, 10.0, # left arm (3 joints: shoulder_pitch, shoulder_roll, elbow)
+    10.0, 5.0, 5.0, 1.0, 1.0, 1.0, # right leg (6 joints: hip_yaw, hip_roll, hip_pitch, knee, ankle_pitch, ankle_roll)
+    10.0, 10.0, 10.0 # right arm (3 joints: shoulder_pitch, shoulder_roll, elbow)
 ]) # gain vector for postural task
 
 contactNormal = np.array(
     [0.0, 0.0, 1.0]
 )  # direction of the normal to the contact surface
 
-rf_frame_name = 'leg_right_sole_joint_fixed'
-lf_frame_name = 'leg_left_sole_joint_fixed'
+rf_frame_name = 'right_sole_joint_fixed'
+lf_frame_name = 'left_sole_joint_fixed'
 
-urdf = './robot/robot.urdf'
-srdf = './robot/robot.srdf'
-path_to_urdf = './robot'
-mujoco_model_path = './robot/robot.xml'
+urdf = './robot/v1/urdf/robot_mod.urdf'
+srdf = './robot/v1/urdf/robot_mod.srdf'
+path_to_urdf = './robot/v1/urdf'
+mujoco_model_path = './robot/v1/mujoco/robot.xml'

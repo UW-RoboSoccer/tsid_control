@@ -42,38 +42,38 @@ class FootTrajectory:
         """
         return np.array([self.x(t, 3), self.y(t, 3), self.z(t, 3)])
     
-# Example usage:
-t = [0, 1]  # Start and end times
-start = np.array([0, 0, 0])  # Start position
-target = np.array([1, 1, 0])  # Target position
-step_height = 0.2  # Height of the step
-trajectory = FootTrajectory(t, start, target, step_height)
+if __name__ == "__main__":
+    t = [0, 1]  # Start and end times
+    start = np.array([0, 0, 0])  # Start position
+    target = np.array([1, 1, 0])  # Target position
+    step_height = 0.2  # Height of the step
+    trajectory = FootTrajectory(t, start, target, step_height)
 
-# Plot position in 3D
-import matplotlib.pyplot as plt
-x = trajectory.x(np.linspace(t[0], t[1], 100))
-y = trajectory.y(np.linspace(t[0], t[1], 100))
-z = trajectory.z(np.linspace(t[0], t[1], 100))
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot(x, y, z)
-ax.set_xlabel('X Position')
-ax.set_ylabel('Y Position')
-ax.set_zlabel('Z Position')
-plt.title('Foot Trajectory')
-plt.show()
+    # Plot position in 3D
+    import matplotlib.pyplot as plt
+    x = trajectory.x(np.linspace(t[0], t[1], 100))
+    y = trajectory.y(np.linspace(t[0], t[1], 100))
+    z = trajectory.z(np.linspace(t[0], t[1], 100))
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot(x, y, z)
+    ax.set_xlabel('X Position')
+    ax.set_ylabel('Y Position')
+    ax.set_zlabel('Z Position')
+    plt.title('Foot Trajectory')
+    plt.show()
 
-rise_ratio = 0.1
-trajectory = FootTrajectory(t, start, target, step_height, rise_ratio)
-# Plot position in 3D with different rise ratio
-x = trajectory.x(np.linspace(t[0], t[1], 100))
-y = trajectory.y(np.linspace(t[0], t[1], 100))
-z = trajectory.z(np.linspace(t[0], t[1], 100))
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot(x, y, z)
-ax.set_xlabel('X Position')
-ax.set_ylabel('Y Position')
-ax.set_zlabel('Z Position')
-plt.title('Foot Trajectory with Rise Ratio {}'.format(rise_ratio))
-plt.show()
+    rise_ratio = 0.1
+    trajectory = FootTrajectory(t, start, target, step_height, rise_ratio)
+    # Plot position in 3D with different rise ratio
+    x = trajectory.x(np.linspace(t[0], t[1], 100))
+    y = trajectory.y(np.linspace(t[0], t[1], 100))
+    z = trajectory.z(np.linspace(t[0], t[1], 100))
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot(x, y, z)
+    ax.set_xlabel('X Position')
+    ax.set_ylabel('Y Position')
+    ax.set_zlabel('Z Position')
+    plt.title('Foot Trajectory with Rise Ratio {}'.format(rise_ratio))
+    plt.show()

@@ -171,7 +171,7 @@ class Biped:
             self.trajLF.setReference(H_lf_ref)
             self.leftFootTask.setReference(self.trajLF.computeNext())
 
-            self.formulation.removeRigidContact(self.contactLF.name)
+            self.formulation.removeRigidContact(self.contactLF.name, 0.0)
             self.contact_LF_active = False
 
     def removeRightFootContact(self):
@@ -180,7 +180,7 @@ class Biped:
             self.trajRF.setReference(H_rf_ref)
             self.rightFootTask.setReference(self.trajRF.computeNext())
 
-            self.formulation.removeRigidContact(self.contactRF.name)
+            self.formulation.removeRigidContact(self.contactRF.name, 0.0)
             self.contact_RF_active = False
 
     def addLeftFootContact(self):
@@ -213,6 +213,7 @@ class Biped:
 
     def gen_footstep(self, pos, r_foot, steps, height):
         pos0 = self.robot.framePosition(self.formulation.data(), self.RF if r_foot else self.LF).translation
+        steps = int(steps)  # Convert to integer
         x = np.linspace(pos0[0], pos[0], steps)
         y = np.linspace(pos0[1], pos[1], steps)
         z = [4 * height * (i / steps) * (1 - i / steps) for i in range(steps)]
@@ -220,7 +221,8 @@ class Biped:
         traj[:, 0] = x
         traj[:, 1] = y
         traj[:, 2] = z
-
+        return traj
+    
     def compute_capture_point(self, com, dcom, w):
         cp = com + dcom / w
         cp[2] = 0
@@ -238,3 +240,46 @@ class Biped:
         v += dt * dv
         q = pin.integrate(self.model, q, dt * v_mean)
         return q, v
+    
+    def falling(self):
+        """Check if the robot is falling by computing capture point and support polygon."""
+        data = self.formulation.data()
+        com = self.robot.com(data)
+        com_vel = self.robot.com_vel(data)
+        w = np.sqrt(9.81 / com[2])
+        cp = self.compute_capture_point(com, com_vel, w)
+        
+        # Get support polygon
+        support_polygon = self.compute_support_polygon()
+        
+        # Check if capture point is outside support polygon
+        # Simple check: if CP is outside the convex hull of support points
+        cp_2d = cp[:2]
+        support_points = support_polygon
+        
+        # Check if CP is outside the line segment between feet
+        if len(support_points) >= 2:
+            foot1 = support_points[0]
+            foot2 = support_points[1]
+            
+            # Vector from foot1 to foot2
+            foot_vec = foot2 - foot1
+            # Vector from foot1 to capture point
+            cp_vec = cp_2d - foot1
+            
+            # Project CP onto foot line
+            t = np.dot(cp_vec, foot_vec) / np.dot(foot_vec, foot_vec)
+            
+            # If projection is outside [0,1], CP is outside support
+            if t < 0 or t > 1:
+                return True
+                
+            # Check distance from CP to foot line
+            proj_point = foot1 + t * foot_vec
+            distance = np.linalg.norm(cp_2d - proj_point)
+            
+            # If distance is large, robot is falling
+            if distance > 0.05:  # 5cm threshold
+                return True
+        
+        return False
