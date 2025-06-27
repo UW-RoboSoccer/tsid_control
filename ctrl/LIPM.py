@@ -31,27 +31,18 @@ class LIPM:
     def zmp(self, t):
         return self.pos(t) - self.acc(t) / self.w**2
     
-    def make_trajectory(self, t, dt, pos0, vel0, acc0, zmp_traj):
+    def make_trajectory(self, t, dt, pos0, vel0, acc0, zmp):
         '''
-        time-varying ZMP trajectory:
-        t: [start_time, end_time]
         pos [x, y]
         vel [vx, vy]
         acc [ax, ay]
-        zmp_traj: array of [x, y] zmp positions (one per time step)
         '''
         duration = t[1] - t[0]
-        pos = pos0.copy()
-        vel = vel0.copy()
-        acc = acc0.copy()
-
-        self.x.traj.clear()
-        self.y.traj.clear()
-
-        N = len(zmp_traj)
-
-        for i in range(N):
-            acc = (zmp_traj[i] - pos) * self.w**2
+        pos = pos0
+        vel = vel0
+        acc = acc0
+        for i in range(math.floor(duration / dt)):
+            acc = (zmp - pos) * self.w**2
             vel += acc * dt
             pos += vel * dt
             self.x.traj.append([pos[0], vel[0], acc[0]])
