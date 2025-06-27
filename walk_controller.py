@@ -25,6 +25,7 @@ class Controller:
         zmp_traj: List of ZMP trajectory points
         dcm_traj: List of DCM trajectory points
         com_traj: List of CoM trajectory points
+        logged_com_traj: List of logged CoM positions
     """
     def __init__(self, biped, conf):
         """Initialize the controller with the biped model and configuration parameters.
@@ -57,6 +58,7 @@ class Controller:
         self.zmp_traj = []       # ZMP trajectory
         self.dcm_traj = []       # DCM trajectory
         self.com_traj = []       # CoM trajectory
+        self.logged_com_traj = []
         
     def gen_footsteps(self, traj, orientation):
         """Generate footstep positions and trajectories from a reference path.
@@ -335,6 +337,7 @@ class Controller:
         self.biped.sample_com.vel(com_control[1])
         self.biped.sample_com.acc(com_control[2])
         self.biped.trajCom.setReference(self.biped.sample_com)
+        self.logged_com_traj.append(com_control[0].copy())
         
         # Set foot position
         footstep = self.footstep_traj[self.current_step]
@@ -362,6 +365,7 @@ class Controller:
         self.footstep_traj = []
         self.dcm_traj = []
         self.com_traj = []
+        self.logged_com_traj = []
 
         # Reset state variables
         self.x = np.zeros(3)
@@ -391,9 +395,8 @@ class Controller:
                 ax.plot(t[0], t[1], 'go')
 
         # Plot CoM trajectory
-        for com in self.com_traj:
-            for t in com:
-                ax.plot(t[0], t[1], 'yo')
+        for com in self.logged_com_traj:
+            ax.plot(com[0], com[1], 'yo')
 
         # Plot ZMP trajectory
         for zmp in self.zmp_traj:
@@ -449,7 +452,7 @@ controller.gen_zmp_traj()
 print("ZMP trajectory generated:", controller.zmp_traj)
 
 # Generate CoM trajectory
-controller.gen_com_traj(np.array([0, -0.06]), np.array([0.2, 0]))
+# controller.gen_com_traj(np.array([0, -0.06]), np.array([0.2, 0]))
 
 # Initialize plot
 fig, ax = plt.subplots()
