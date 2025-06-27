@@ -1,0 +1,21 @@
+<robot name="biped_robot">
+  <group name="all">
+    <chain base_link="base_link" tip="head_joint"/>
+  </group>
+  <end_effector name="left_foot" parent_link="foot_sole_2"/>
+  <end_effector name="right_foot" parent_link="foot_sole"/>
+  <reference_configuration name="standing">
+    <joint_value joint_name="right_ankle_roll" value="0.0"/>
+    <joint_value joint_name="right_ankle_pitch" value="0.0"/>
+    <joint_value joint_name="right_knee" value="0.0"/>
+    <joint_value joint_name="right_hip_pitch" value="0.0"/>
+    <joint_value joint_name="right_hip_roll" value="0.0"/>
+    <joint_value joint_name="right_hip_yaw" value="0.0"/>
+    <joint_value joint_name="left_ankle_roll_2" value="0.0"/>
+    <joint_value joint_name="left_ankle_pitch_2" value="0.0"/>
+    <joint_value joint_name="left_knee_2" value="0.0"/>
+    <joint_value joint_name="left_hip_pitch_2" value="0.0"/>
+    <joint_value joint_name="left_hip_roll_2" value="0.0"/>
+    <joint_value joint_name="left_hip_yaw_2" value="0.0"/>
+  </reference_configuration>
+</robot> 

@@ -1,10 +1,7 @@
 <?xml version="1.0" ?>
 <!-- Generated using onshape-to-robot -->
 <!-- Onshape https://cad.onshape.com/documents/edea034631796554fe7de906/w/0725cd49d9878c86b643a14d/e/ef4419f73ceb4e549626bf9b -->
-<robot name="C:\Users\David\desktop\v1_urdf">
-  <mujoco>
-    <compiler meshdir="assets/merged" />
-  </mujoco>
+<robot name="biped_robot">
   <!-- Link torso -->
   <link name="torso">
     <inertial>

@@ -18,9 +18,59 @@ class Biped:
         self.model = robot.model()
 
         pin.loadReferenceConfigurations(self.model, conf.srdf, False)
-        self.q0 = q = self.model.referenceConfigurations["standing"]
+        
+        # Try to load the standing configuration, but fall back to neutral if it fails
+        try:
+            self.q0 = q = self.model.referenceConfigurations["standing"]
+        except KeyError:
+            print("WARNING: Could not load 'standing' configuration from SRDF. Creating standing configuration.")
+            # Create a standing configuration with feet on the ground
+            self.q0 = q = pin.neutral(self.model)
+            
+            # Set the robot to stand with feet on the ground
+            # The first 7 elements are [x, y, z, qw, qx, qy, qz] for the floating base
+            # Set the height to be above the ground so feet touch
+            q[2] = 0.4  # Set z height to place feet on ground
+            
+            # Adjust joint angles for a standing pose
+            # These indices correspond to the joint ordering in the robot
+            # You may need to adjust these based on your specific robot model
+            q[7] = 0.0   # head yaw
+            q[8] = 0.0   # head pitch
+            
+            # Left leg - standing pose
+            q[9] = 0.0   # left hip pitch
+            q[10] = 0.0  # left hip roll  
+            q[11] = 0.0  # left hip yaw
+            q[12] = 0.0  # left knee
+            q[13] = 0.0  # left ankle pitch
+            
+            # Right leg - standing pose
+            q[17] = 0.0  # right hip pitch
+            q[18] = 0.0  # right hip roll
+            q[19] = 0.0  # right hip yaw
+            q[20] = 0.0  # right knee
+            q[21] = 0.0  # right ankle pitch
+            
+            # Arms - neutral pose
+            q[14] = 0.0  # left shoulder pitch
+            q[15] = 0.0  # left shoulder roll
+            q[16] = 0.0  # left elbow
+            
+            q[22] = 0.0  # right shoulder pitch
+            q[23] = 0.0  # right shoulder roll
+            q[24] = 0.0  # right elbow
+        
         v = np.zeros(robot.nv)
 
+        # Debug: Print available frames
+        print("Available frames in robot model:")
+        for i in range(self.model.nframes):
+            frame_name = self.model.frames[i].name
+            print(f"  {i}: {frame_name}")
+        
+        print(f"Looking for frames: {conf.rf_frame_name}, {conf.lf_frame_name}")
+        
         assert self.model.existFrame(conf.rf_frame_name)
         assert self.model.existFrame(conf.lf_frame_name)
 
@@ -92,6 +142,9 @@ class Biped:
         formulation.addMotionTask(comTask, conf.w_com, 1, 0.0)
 
         postureTask = tsid.TaskJointPosture("task-posture", robot)
+        print(f"DEBUG: gain_vector size: {len(conf.gain_vector)}")
+        print(f"DEBUG: gain_vector: {conf.gain_vector}")
+        print(f"DEBUG: robot.na (number of actuated joints): {robot.na}")
         postureTask.setKp(conf.kp_posture * conf.gain_vector)
         postureTask.setKd(2.0 * np.sqrt(conf.kp_posture * conf.gain_vector))
         postureTask.setMask(conf.masks_posture)

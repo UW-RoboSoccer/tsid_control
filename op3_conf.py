@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 N_SIMULATION = 500  # number of time steps simulated
 dt = 0.002  # controller time step
@@ -10,6 +11,10 @@ step_length = 0.1  # length of the step
 step_height = 0.05  # height of the step
 step_width = 0.1275  # width of the step
 step_time = 0.7  # time to complete the step
+
+# DCM controller parameters
+k_dcm = 1.0  # DCM feedback gain
+m = 1.5  # robot mass (kg)
 
 w_com = 1.0  # weight of center of mass task
 w_am = 1e-3  # weight of angular momentum task
@@ -39,24 +44,26 @@ kp_com = 10.0  # proportional gain of center of mass task
 kp_am = 10.0  # proportional gain of angular momentum task
 kp_posture = 1.0  # proportional gain of joint posture task
 
-masks_posture = np.ones(18)
+masks_posture = np.ones(20)
 
 gain_vector = np.array([
-    100.0, 100.0, # head
-    10.0, 5.0, 5.0, 1.0, 1.0, # left leg
-    10.0, 10.0, 10.0, # left arm
-    10.0, 5.0, 5.0, 1.0, 1.0, # right leg
-    10.0, 10.0, 10.0 # right arm
-]) # gain vector for postural task
+    100.0, 100.0, # head (2 joints)
+    10.0, 5.0, 5.0, 1.0, 1.0, # left leg (5 joints)
+    10.0, 10.0, 10.0, # left arm (3 joints)
+    10.0, 5.0, 5.0, 1.0, 1.0, # right leg (5 joints)
+    10.0, 10.0, 10.0, 1.0, 1.0 # right arm (5 joints)
+]) # gain vector for postural task (20 joints total)
 
 contactNormal = np.array(
     [0.0, 0.0, 1.0]
 )  # direction of the normal to the contact surface
 
-rf_frame_name = 'leg_right_sole_joint_fixed'
-lf_frame_name = 'leg_left_sole_joint_fixed'
+rf_frame_name = 'foot_sole'
+lf_frame_name = 'foot_2_sole'
 
-urdf = './robot/robot.urdf'
-srdf = './robot/robot.srdf'
-path_to_urdf = './robot'
-mujoco_model_path = './robot/robot.xml'
+__dir__ = os.path.dirname(os.path.abspath(__file__))
+
+urdf = os.path.join(__dir__, 'robot/v1/urdf/robot_mod.urdf')
+srdf = os.path.join(__dir__, 'robot/v1/urdf/robot_mod.srdf')
+path_to_urdf = os.path.join(__dir__, 'robot/v1')
+mujoco_model_path = os.path.join(__dir__, 'robot/v1/mujoco/robot.xml')

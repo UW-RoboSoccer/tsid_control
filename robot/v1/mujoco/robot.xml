@@ -51,6 +51,10 @@
     <exclude body1="sts3250_3" body2="foot_2"/>
   </contact>
   <worldbody>
+    <!-- Ground plane -->
+    <geom name="ground" type="plane" size="10 10 0.1" pos="0 0 -0.1" quat="1 0 0 0" 
+          rgba="0.8 0.8 0.8 1" contype="1" conaffinity="1"/>
+    
     <!-- Link torso -->
     <body name="torso" pos="0 0 0" quat="1 0 0 0" childclass="C:\Users\David\desktop\v1_mujoco">
       <freejoint name="torso_freejoint"/>

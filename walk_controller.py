@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.interpolate import CubicSpline
+import pinocchio as pin
 
 class Controller:
     """Bipedal walking controller using Divergent Component of Motion (DCM) approach.
@@ -160,8 +161,15 @@ class Controller:
         Args:
             depth: Number of future steps to consider
         """
+        # Clear previous DCM trajectory
+        self.dcm_traj = []
+        
         # Initialize DCM endpoints array
         dcm_endpoints = []
+        
+        # Ensure we have enough footsteps
+        if len(self.footsteps) < depth:
+            depth = len(self.footsteps)
         
         # Start from the VRP (Virtual Repellent Point) at the last footstep
         vrp_pos = self.footsteps[depth - 1][:2]
@@ -171,9 +179,9 @@ class Controller:
         dcm_endpoints.append(dcm_end)
 
         # Calculate DCM endpoints by backward recursion
-        for i in range(depth-2, 0, -1):
+        for i in range(depth-2, -1, -1):
             # Get VRP position (foot position)
-            vrp_pos = self.footsteps[i + self.current_step][:2]
+            vrp_pos = self.footsteps[i][:2]
             
             # Calculate initial DCM for this step to reach dcm_end at the end of the step
             dcm_i = self.back_calc_dcm(vrp_pos, dcm_end)
@@ -183,25 +191,24 @@ class Controller:
             dcm_endpoints.insert(0, dcm_i)  # Insert at beginning to maintain order
 
         # Generate intermediate DCM points with exponential curves
-        for i in range(len(dcm_endpoints)):
-            dcm_end = dcm_endpoints[i]  # Final DCM for this step
-            vrp = self.footsteps[i + self.current_step][:2]
+        for i in range(len(dcm_endpoints) - 1):  # -1 because we don't need trajectory for last endpoint
+            dcm_start = dcm_endpoints[i]  # Initial DCM for this step
+            dcm_end = dcm_endpoints[i + 1]  # Final DCM for this step
+            vrp = self.footsteps[i][:2]
 
             dcm_inter_step = []  # List to hold DCM points for this step
 
             # Generate DCM points for this step
-            for j in range(int(self.conf.step_time / self.dt)):
+            num_points = int(self.conf.step_time / self.dt)
+            for j in range(num_points):
                 t = j * self.dt
                 
                 # DCM evolution follows: ξ(t) = p + e^(t/T_c)*(ξ_0 - p)
                 # where p is the VRP position and ξ_0 is the initial DCM
-                dcm_t = vrp + (dcm_end - vrp) * np.exp((t - self.conf.step_time) / self.w_n)
+                dcm_t = vrp + (dcm_start - vrp) * np.exp(t / self.w_n)
                 dcm_inter_step.append(dcm_t)
 
             self.dcm_traj.append(dcm_inter_step)  # Append the DCM points for this step
-
-        # Add the final DCM point
-        self.dcm_traj[-1].append(dcm_endpoints[-1])
 
         return dcm_endpoints
 
@@ -230,16 +237,19 @@ class Controller:
         ZMP reference to drive the DCM toward the reference.
         
         Args:
-            dcm_ref: Reference DCM position [x, y, z]
-            vrp_i: Initial vrp position [x, y, z]
+            dcm_ref: Reference DCM position [x, y] (2D)
+            vrp_i: Initial vrp position [x, y, z] (3D)
             
         Returns:
             com: Center of Mass (CoM) state [x, dx, ddx]
             F_ext: External force required [Fx, Fy, Fz]
         """
+        # Extend DCM reference to 3D by adding z component
+        dcm_ref_3d = np.array([dcm_ref[0], dcm_ref[1], self.conf.z0])
+        
         # DCM feedback control law:
         # p = ξ + T_c*ξ̇ - T_c*k_ξ*(ξ - ξ_ref) - T_c*ξ̇_ref
-        vrp_control = vrp_i + (1 + self.conf.k_dcm * self.w_n) * (self.e - dcm_ref)
+        vrp_control = vrp_i + (1 + self.conf.k_dcm * self.w_n) * (self.e - dcm_ref_3d)
         
         # Convert VRP to ZMP by subtracting pendulum height in z direction
         zmp_control = vrp_control - np.array([0, 0, self.conf.z0])
@@ -325,28 +335,39 @@ class Controller:
         if self.current_step % self.depth == 0:
             self.gen_dcm_traj()
         
-        # Get current DCM and ZMP references
-        dcm_ref = self.dcm_traj[self.time_step]
-        vrp_ref = self.footstep_traj[self.current_step][1][0][:3, 3] + self.conf.z0 * np.array([0, 0, 1])
-        
-        # Calculate DCM feedback control
-        com_control, F_ext = self.dcm_controller(dcm_ref, vrp_ref)
+        # Get current DCM and ZMP references with bounds checking
+        if (self.current_step < len(self.dcm_traj) and 
+            self.time_step < len(self.dcm_traj[self.current_step]) and 
+            self.current_step < len(self.footstep_traj)):
+            
+            dcm_ref = self.dcm_traj[self.current_step][self.time_step]
+            vrp_ref = self.footstep_traj[self.current_step][1][0][:3, 3] + self.conf.z0 * np.array([0, 0, 1])
+            
+            # Calculate DCM feedback control
+            com_control, F_ext = self.dcm_controller(dcm_ref, vrp_ref)
 
-        # Set CoM task references
-        self.biped.sample_com.pos(com_control[0])
-        self.biped.sample_com.vel(com_control[1])
-        self.biped.sample_com.acc(com_control[2])
-        self.biped.trajCom.setReference(self.biped.sample_com)
-        self.logged_com_traj.append(com_control[0].copy())
-        
-        # Set foot position
-        footstep = self.footstep_traj[self.current_step]
-        if footstep[0]: # Right foot
-            self.biped.sample_RF.value(footstep[1][self.time_step][:3, 3])
-            self.biped.trajRF.setReference(self.biped.sample_RF)
-        else: # Left foot
-            self.biped.sample_LF.value(footstep[1][self.time_step][:3, 3])
-            self.biped.trajLF.setReference(self.biped.sample_LF)
+            # Set CoM task references using the correct TSID API
+            self.biped.sample_com.value(com_control[0])
+            self.biped.sample_com.derivative(com_control[1])
+            self.biped.sample_com.second_derivative(com_control[2])
+            # Use the vector directly instead of the TrajectorySample object
+            self.biped.trajCom.setReference(com_control[0])
+            self.logged_com_traj.append(com_control[0].copy())
+            
+            # Set foot position using the correct TSID pattern
+            footstep = self.footstep_traj[self.current_step]
+            if footstep[0]: # Right foot
+                # Get the full transformation matrix from the footstep trajectory
+                foot_transform = footstep[1][self.time_step]
+                # Update the trajectory and compute next sample
+                self.biped.trajRF.setReference(pin.SE3(foot_transform))
+                self.biped.rightFootTask.setReference(self.biped.trajRF.computeNext())
+            else: # Left foot
+                # Get the full transformation matrix from the footstep trajectory
+                foot_transform = footstep[1][self.time_step]
+                # Update the trajectory and compute next sample
+                self.biped.trajLF.setReference(pin.SE3(foot_transform))
+                self.biped.leftFootTask.setReference(self.biped.trajLF.computeNext())
 
         # Update current step index
         self.time_step += 1
@@ -385,7 +406,6 @@ class Controller:
         for footstep in self.footstep_traj:
             foot = footstep[0]
             traj = footstep[1]
-            print(foot)
             for t in traj:
                 ax.plot(t[0, 3], t[1, 3], 'ro' if foot else 'bo')
         
@@ -408,70 +428,3 @@ class Controller:
         ax.set_title('Footstep and DCM Trajectory')
         ax.axis('equal')
         ax.grid()
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-import op3_conf as conf
-from biped import Biped
-
-# Initialize the Biped robot model
-biped = Biped(conf)
-# Initialize the controller
-controller = Controller(biped, conf)
-# Generate a reference path based on linear and angular velocities
-v = 1.0
-w = 0.0
-T = conf.N_SIMULATION * conf.dt
-dt = conf.dt
-
-# Initial position
-x = 0.0
-y = 0.0
-
-# Generate reference trajectory
-t = np.linspace(0, T, int(T / dt))
-traj = np.zeros((len(t), 2))
-for i in range(len(t)):
-    x = x + v * dt * np.cos(w)
-    y = y + v * dt * np.sin(w)
-    traj[i, :] = [x, y]
-
-initial_orientation = np.array([np.cos(w), np.sin(w)])  # Initial orientation vector
-
-# Generate footstep trajectory
-gen_foosteps = controller.gen_footsteps(traj, initial_orientation)
-print("Footsteps generated:", gen_foosteps)
-
-# Generate DCM trajectory
-gen_dcm_endpoints = controller.gen_dcm_traj(5)
-print("DCM endpoints generated:", gen_dcm_endpoints)
-
-# Generate ZMP trajectory
-controller.gen_zmp_traj()
-print("ZMP trajectory generated:", controller.zmp_traj)
-
-# Generate CoM trajectory
-# controller.gen_com_traj(np.array([0, -0.06]), np.array([0.2, 0]))
-
-# Initialize plot
-fig, ax = plt.subplots()
-
-# Plot the footstep and DCM trajectories
-controller.plot_path(ax)
-
-# Plot the footsteps
-for footstep in gen_foosteps:
-    foot = footstep[3]
-    ax.plot(footstep[0], footstep[1], 'mo')
-
-# Plot the DCM endpoints
-for dcm in gen_dcm_endpoints:
-    ax.plot(dcm[0], dcm[1], 'co')
-
-# set axis limits
-ax.set_xlim(0, .5)
-ax.set_ylim(-.5, .5)
-
-# Show the plot
-plt.show()
