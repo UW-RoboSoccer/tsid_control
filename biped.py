@@ -38,19 +38,19 @@ class Biped:
             q[7] = 0.0   # head yaw
             q[8] = 0.0   # head pitch
             
-            # Left leg - standing pose
+            # Left leg - standing pose with slight knee bend for stability
             q[9] = 0.0   # left hip pitch
             q[10] = 0.0  # left hip roll  
             q[11] = 0.0  # left hip yaw
-            q[12] = 0.0  # left knee
-            q[13] = 0.0  # left ankle pitch
+            q[12] = 0.05  # left knee - smaller bend for more stability
+            q[13] = -0.05 # left ankle pitch - compensate for knee bend
             
-            # Right leg - standing pose
+            # Right leg - standing pose with slight knee bend for stability
             q[17] = 0.0  # right hip pitch
             q[18] = 0.0  # right hip roll
             q[19] = 0.0  # right hip yaw
-            q[20] = 0.0  # right knee
-            q[21] = 0.0  # right ankle pitch
+            q[20] = 0.05  # right knee - smaller bend for more stability
+            q[21] = -0.05 # right ankle pitch - compensate for knee bend
             
             # Arms - neutral pose
             q[14] = 0.0  # left shoulder pitch
@@ -223,8 +223,7 @@ class Biped:
             H_lf_ref = self.robot.framePosition(self.formulation.data(), self.LF)
             self.trajLF.setReference(H_lf_ref)
             self.leftFootTask.setReference(self.trajLF.computeNext())
-
-            self.formulation.removeRigidContact(self.contactLF.name)
+            self.formulation.removeRigidContact(self.contactLF.name, 0.0)
             self.contact_LF_active = False
 
     def removeRightFootContact(self):
@@ -232,8 +231,7 @@ class Biped:
             H_rf_ref = self.robot.framePosition(self.formulation.data(), self.RF)
             self.trajRF.setReference(H_rf_ref)
             self.rightFootTask.setReference(self.trajRF.computeNext())
-
-            self.formulation.removeRigidContact(self.contactRF.name)
+            self.formulation.removeRigidContact(self.contactRF.name, 0.0)
             self.contact_RF_active = False
 
     def addLeftFootContact(self):

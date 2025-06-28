@@ -27,6 +27,8 @@ class Controller:
         dcm_traj: List of DCM trajectory points
         com_traj: List of CoM trajectory points
         logged_com_traj: List of logged CoM positions
+        swing_foot: Current swing foot ('left' or 'right' or None)
+        last_step: Index of the last processed step
     """
     def __init__(self, biped, conf):
         """Initialize the controller with the biped model and configuration parameters.
@@ -61,6 +63,13 @@ class Controller:
         self.com_traj = []       # CoM trajectory
         self.logged_com_traj = []
         
+        # Initialize rate limiting variables
+        self.prev_dcm_ref = None
+        self.prev_com_ref = None
+        
+        self.swing_foot = None  # 'left' or 'right' or None
+        self.last_step = -1
+        
     def gen_footsteps(self, traj, orientation):
         """Generate footstep positions and trajectories from a reference path.
         
@@ -78,10 +87,14 @@ class Controller:
 
         tangent = orientation
         normal = np.array([-tangent[1], tangent[0]])
-        # Initial footstep at origin
-        footsteps.append(np.array([self.conf.step_width * normal[0] * -1, self.conf.step_width * normal[1] * -1, 0, False]))  # Initial footstep at origin
+        
+        # Initial footstep positions - more conservative placement
+        left_init = np.array([-self.conf.step_width/2, 0, 0, False])  # Left foot
+        right_init = np.array([self.conf.step_width/2, 0, 0, True])   # Right foot
+        footsteps.append(left_init)
+        footsteps.append(right_init)
 
-        # Generate discrete footstep positions
+        # Generate discrete footstep positions with more conservative approach
         for i in range(len(traj) - 1):
             # Calculate path segment direction
             dx = traj[i + 1, 0] - traj[i, 0]
@@ -94,7 +107,10 @@ class Controller:
             if dist >= self.conf.step_length:
                 # Calculate tangent and normal vectors to the path
                 tangent = np.array([dx, dy])
-                tangent /= np.linalg.norm(tangent)
+                if np.linalg.norm(tangent) > 1e-6:
+                    tangent /= np.linalg.norm(tangent)
+                else:
+                    tangent = np.array([1.0, 0.0])  # Default forward direction
                 normal = np.array([-tangent[1], tangent[0]])  # Perpendicular to tangent
                 
                 # Create footstep: [x, y, yaw, is_right_foot]
@@ -109,7 +125,7 @@ class Controller:
                 dist = 0
                 right_foot = not right_foot
     
-        # Generate smooth trajectories between footsteps
+        # Generate smooth trajectories between footsteps with better constraints
         footstep_traj = []
         num_points = int(self.conf.step_time / self.conf.dt)
         t = np.linspace(0, 1, num_points)
@@ -117,6 +133,12 @@ class Controller:
         for i in range(len(footsteps) - 2):
             p0 = footsteps[i][:2]    # Start position (x,y)
             p1 = footsteps[i + 2][:2]  # End position (x,y)
+            
+            # Limit maximum step distance for stability
+            step_dist = np.linalg.norm(p1 - p0)
+            if step_dist > 0.05:  # More conservative step distance limit
+                direction = (p1 - p0) / step_dist
+                p1 = p0 + 0.05 * direction
             
             # Create cubic spline for x-y trajectory
             t_spline = np.array([0, 1])
@@ -126,7 +148,7 @@ class Controller:
             x_traj = CubicSpline(t_spline, x_control)(t)
             y_traj = CubicSpline(t_spline, y_control)(t)
             
-            # Create parabolic height profile for smooth foot lifting
+            # Create smoother height profile for better foot clearance
             z_traj = 4 * self.conf.step_height * t * (1 - t)
 
             # Create homogeneous transformation matrices for each point
@@ -149,67 +171,48 @@ class Controller:
         self.footstep_traj = footstep_traj
         self.footsteps = footsteps
 
+        # Print first 10 footsteps for debugging
+        print("First 10 footsteps:")
+        for i in range(min(10, len(footsteps))):
+            print(footsteps[i])
+
         return footsteps
 
-    def gen_dcm_traj(self, depth=3):
-        """Generate DCM trajectory by backward recursion from final footstep.
-        
-        Creates a Divergent Component of Motion (DCM) trajectory by calculating
-        backwards from a terminal DCM position at the final footstep, ensuring
-        DCM convergence to each Virtual Repellent Point (VRP) position.
-        
-        Args:
-            depth: Number of future steps to consider
-        """
-        # Clear previous DCM trajectory
+    def gen_dcm_traj(self):
+        """Generate the DCM trajectory for the entire footstep plan."""
         self.dcm_traj = []
-        
-        # Initialize DCM endpoints array
         dcm_endpoints = []
-        
-        # Ensure we have enough footsteps
-        if len(self.footsteps) < depth:
-            depth = len(self.footsteps)
-        
-        # Start from the VRP (Virtual Repellent Point) at the last footstep
-        vrp_pos = self.footsteps[depth - 1][:2]
-        dcm_end = vrp_pos  # Terminal DCM equals the terminal VRP
-
-        # Add final DCM endpoint
-        dcm_endpoints.append(dcm_end)
-
-        # Calculate DCM endpoints by backward recursion
-        for i in range(depth-2, -1, -1):
-            # Get VRP position (foot position)
+        N = len(self.footsteps)
+        if N < 2:
+            return []
+        # Set the final DCM endpoint at the last footstep
+        dcm_end = self.footsteps[-1][:2]
+        dcm_endpoints = [dcm_end]
+        # Backward recursion for all steps
+        for i in range(N-2, -1, -1):
             vrp_pos = self.footsteps[i][:2]
-            
-            # Calculate initial DCM for this step to reach dcm_end at the end of the step
             dcm_i = self.back_calc_dcm(vrp_pos, dcm_end)
-            
-            # Update for next iteration
             dcm_end = dcm_i
-            dcm_endpoints.insert(0, dcm_i)  # Insert at beginning to maintain order
-
-        # Generate intermediate DCM points with exponential curves
-        for i in range(len(dcm_endpoints) - 1):  # -1 because we don't need trajectory for last endpoint
-            dcm_start = dcm_endpoints[i]  # Initial DCM for this step
-            dcm_end = dcm_endpoints[i + 1]  # Final DCM for this step
+            dcm_endpoints.insert(0, dcm_i)
+        # Generate DCM segments for all steps
+        for i in range(len(dcm_endpoints) - 1):
+            dcm_start = dcm_endpoints[i]
+            dcm_end = dcm_endpoints[i + 1]
             vrp = self.footsteps[i][:2]
-
-            dcm_inter_step = []  # List to hold DCM points for this step
-
-            # Generate DCM points for this step
+            dcm_inter_step = []
             num_points = int(self.conf.step_time / self.dt)
             for j in range(num_points):
                 t = j * self.dt
-                
-                # DCM evolution follows: ξ(t) = p + e^(t/T_c)*(ξ_0 - p)
-                # where p is the VRP position and ξ_0 is the initial DCM
-                dcm_t = vrp + (dcm_start - vrp) * np.exp(t / self.w_n)
+                # Use linear interpolation between DCM start and end points
+                # This ensures the DCM actually moves forward
+                alpha = t / self.conf.step_time
+                dcm_t = dcm_start + alpha * (dcm_end - dcm_start)
                 dcm_inter_step.append(dcm_t)
-
-            self.dcm_traj.append(dcm_inter_step)  # Append the DCM points for this step
-
+            self.dcm_traj.append(dcm_inter_step)
+        # Print first 10 DCM trajectory points for debugging
+        print("First 10 DCM trajectory points (first step):")
+        for i in range(min(10, len(self.dcm_traj[0]))):
+            print(self.dcm_traj[0][i])
         return dcm_endpoints
 
     def back_calc_dcm(self, vrp_pos, dcm_end):
@@ -231,37 +234,55 @@ class Controller:
         return dcm_ini
 
     def dcm_controller(self, dcm_ref, vrp_i):
-        """DCM feedback controller to calculate ZMP command and external force.
+        """DCM feedback controller to calculate CoM reference and external force."""
+        # Get current robot state from biped
+        data = self.biped.formulation.data()
+        current_com = self.biped.robot.com(data)
+        current_com_vel = self.biped.robot.com_vel(data)
         
-        Implements a feedback controller for DCM tracking, calculating the required
-        ZMP reference to drive the DCM toward the reference.
+        # Update controller state variables
+        self.x = current_com
+        self.dx = current_com_vel
         
-        Args:
-            dcm_ref: Reference DCM position [x, y] (2D)
-            vrp_i: Initial vrp position [x, y, z] (3D)
-            
-        Returns:
-            com: Center of Mass (CoM) state [x, dx, ddx]
-            F_ext: External force required [Fx, Fy, Fz]
-        """
-        # Extend DCM reference to 3D by adding z component
-        dcm_ref_3d = np.array([dcm_ref[0], dcm_ref[1], self.conf.z0])
+        # Compute current DCM (ξ = x + ẋ/ω)
+        self.e = self.x + self.dx / self.w_n
         
-        # DCM feedback control law:
-        # p = ξ + T_c*ξ̇ - T_c*k_ξ*(ξ - ξ_ref) - T_c*ξ̇_ref
-        vrp_control = vrp_i + (1 + self.conf.k_dcm * self.w_n) * (self.e - dcm_ref_3d)
+        # Very conservative DCM feedback control law:
+        com_ref = dcm_ref.copy()
+        com_ref = np.array([dcm_ref[0], dcm_ref[1], self.conf.z0])  # Keep height constant
         
-        # Convert VRP to ZMP by subtracting pendulum height in z direction
-        zmp_control = vrp_control - np.array([0, 0, self.conf.z0])
-        ddx = (1 / self.w_n**2) * (self.x - zmp_control)
-        dx = self.dx + ddx * self.dt
-        x = self.x + dx * self.dt
-
-        com = np.array([x, dx, ddx])
-
-        # Calculate required external force using the ZMP equation
-        F_ext = (self.conf.m / (self.w_n**2)) * (self.x - zmp_control)
-
+        # Very conservative damping - stay close to current position
+        damping_factor_x = 0.1  # Very small movement in x
+        damping_factor_y = 0.05  # Very small movement in y
+        com_ref[0] = damping_factor_x * com_ref[0] + (1 - damping_factor_x) * self.x[0]
+        com_ref[1] = damping_factor_y * com_ref[1] + (1 - damping_factor_y) * self.x[1]
+        com_ref[2] = self.conf.z0  # Keep height constant
+        
+        # Very conservative velocity and acceleration
+        com_vel_ref = np.zeros(3)
+        com_vel_ref[0] = (com_ref[0] - self.x[0]) * 0.5  # Very small gains
+        com_vel_ref[1] = (com_ref[1] - self.x[1]) * 0.5
+        com_vel_ref[2] = (com_ref[2] - self.x[2]) * 1.0
+        
+        com_acc_ref = np.zeros(3)
+        com_acc_ref[0] = (com_vel_ref[0] - self.dx[0]) * 0.5
+        com_acc_ref[1] = (com_vel_ref[1] - self.dx[1]) * 0.5
+        com_acc_ref[2] = (com_vel_ref[2] - self.dx[2]) * 1.0
+        
+        # Rate limit the CoM reference to prevent any large jumps
+        max_com_change = 0.001  # Very small rate limit
+        if hasattr(self, 'prev_com_ref') and self.prev_com_ref is not None:
+            com_change = com_ref - self.prev_com_ref
+            # Apply rate limit to all components
+            for i in range(3):
+                if abs(com_change[i]) > max_com_change:
+                    com_change[i] = np.sign(com_change[i]) * max_com_change
+                    com_ref[i] = self.prev_com_ref[i] + com_change[i]
+        
+        self.prev_com_ref = com_ref.copy()
+        
+        com = np.array([com_ref, com_vel_ref, com_acc_ref])
+        F_ext = np.zeros(3)
         return com, F_ext
     
     def gen_com_traj(self, x0, dx0):
@@ -331,20 +352,40 @@ class Controller:
         This method is called at each simulation step to update the controller
         state and compute the next control commands for the biped robot.
         """
-        # Update trajectories
-        if self.current_step % self.depth == 0:
+        # Only generate DCM trajectory at the start
+        if not self.dcm_traj:
             self.gen_dcm_traj()
+        
+        # Debug prints to understand the issue
+        print(f"DEBUG: current_step={self.current_step}, time_step={self.time_step}")
+        print(f"DEBUG: len(dcm_traj)={len(self.dcm_traj)}, len(footstep_traj)={len(self.footstep_traj)}")
         
         # Get current DCM and ZMP references with bounds checking
         if (self.current_step < len(self.dcm_traj) and 
             self.time_step < len(self.dcm_traj[self.current_step]) and 
             self.current_step < len(self.footstep_traj)):
             
+            print(f"DEBUG: Accessing dcm_traj[{self.current_step}][{self.time_step}]")
             dcm_ref = self.dcm_traj[self.current_step][self.time_step]
-            vrp_ref = self.footstep_traj[self.current_step][1][0][:3, 3] + self.conf.z0 * np.array([0, 0, 1])
+            
+            # Get current robot state for VRP calculation
+            data = self.biped.formulation.data()
+            current_com = self.biped.robot.com(data)
+            vrp_ref = current_com + np.array([0, 0, self.conf.z0])
             
             # Calculate DCM feedback control
             com_control, F_ext = self.dcm_controller(dcm_ref, vrp_ref)
+
+            # Debug: Print CoM reference and actual CoM
+            print(f"DEBUG: CoM reference: {com_control[0]}")
+            print(f"DEBUG: Actual CoM: {self.x}")
+            # Debug: Print foot references
+            if self.current_step < len(self.footstep_traj):
+                footstep = self.footstep_traj[self.current_step]
+                if self.time_step < len(footstep[1]):
+                    foot_transform = footstep[1][self.time_step]
+                    print(f"DEBUG: Foot reference (current step): {foot_transform[:3, 3]}")
+            # Debug: Print QP solver status (will be printed in main loop as well)
 
             # Set CoM task references using the correct TSID API
             self.biped.sample_com.value(com_control[0])
@@ -354,28 +395,105 @@ class Controller:
             self.biped.trajCom.setReference(com_control[0])
             self.logged_com_traj.append(com_control[0].copy())
             
-            # Set foot position using the correct TSID pattern
-            footstep = self.footstep_traj[self.current_step]
-            if footstep[0]: # Right foot
-                # Get the full transformation matrix from the footstep trajectory
-                foot_transform = footstep[1][self.time_step]
-                # Update the trajectory and compute next sample
-                self.biped.trajRF.setReference(pin.SE3(foot_transform))
-                self.biped.rightFootTask.setReference(self.biped.trajRF.computeNext())
-            else: # Left foot
-                # Get the full transformation matrix from the footstep trajectory
-                foot_transform = footstep[1][self.time_step]
-                # Update the trajectory and compute next sample
-                self.biped.trajLF.setReference(pin.SE3(foot_transform))
-                self.biped.leftFootTask.setReference(self.biped.trajLF.computeNext())
+            # Set foot position using the correct TSID pattern with safety checks
+            try:
+                footstep = self.footstep_traj[self.current_step]
+                if footstep[0]: # Right foot
+                    # Get the full transformation matrix from the footstep trajectory
+                    if self.time_step < len(footstep[1]):
+                        foot_transform = footstep[1][self.time_step]
+                        
+                        # Check if the foot position is reasonable
+                        foot_pos = foot_transform[:3, 3]
+                        current_foot_pos = self.biped.robot.framePosition(data, self.biped.RF).translation
+                        foot_distance = np.linalg.norm(foot_pos - current_foot_pos)
+                        
+                        # If foot position is too far, use a closer position
+                        max_foot_distance = 0.02  # More conservative maximum reasonable foot movement
+                        if foot_distance > max_foot_distance:
+                            print(f"Warning: Foot position too far ({foot_distance:.3f}m), limiting movement")
+                            direction = (foot_pos - current_foot_pos) / foot_distance
+                            foot_pos = current_foot_pos + direction * max_foot_distance
+                            foot_transform[:3, 3] = foot_pos
+                        
+                        # Update the trajectory and compute next sample
+                        self.biped.trajRF.setReference(pin.SE3(foot_transform))
+                        self.biped.rightFootTask.setReference(self.biped.trajRF.computeNext())
+                else: # Left foot
+                    # Get the full transformation matrix from the footstep trajectory
+                    if self.time_step < len(footstep[1]):
+                        foot_transform = footstep[1][self.time_step]
+                        
+                        # Check if the foot position is reasonable
+                        foot_pos = foot_transform[:3, 3]
+                        current_foot_pos = self.biped.robot.framePosition(data, self.biped.LF).translation
+                        foot_distance = np.linalg.norm(foot_pos - current_foot_pos)
+                        
+                        # If foot position is too far, use a closer position
+                        max_foot_distance = 0.02  # More conservative maximum reasonable foot movement
+                        if foot_distance > max_foot_distance:
+                            print(f"Warning: Foot position too far ({foot_distance:.3f}m), limiting movement")
+                            direction = (foot_pos - current_foot_pos) / foot_distance
+                            foot_pos = current_foot_pos + direction * max_foot_distance
+                            foot_transform[:3, 3] = foot_pos
+                        
+                        # Update the trajectory and compute next sample
+                        self.biped.trajLF.setReference(pin.SE3(foot_transform))
+                        self.biped.leftFootTask.setReference(self.biped.trajLF.computeNext())
+            except Exception as e:
+                print(f"Warning: Error setting foot trajectory: {e}")
+                # Continue with current foot positions if trajectory setting fails
+        else:
+            print(f"DEBUG: Skipping update - bounds check failed")
+            print(f"DEBUG: current_step={self.current_step}, time_step={self.time_step}")
+            print(f"DEBUG: len(dcm_traj)={len(self.dcm_traj)}")
+            if self.current_step < len(self.dcm_traj):
+                print(f"DEBUG: len(dcm_traj[{self.current_step}])={len(self.dcm_traj[self.current_step])}")
+            print(f"DEBUG: len(footstep_traj)={len(self.footstep_traj)}")
 
-        # Update current step index
+        # Update current step index - FIXED LOGIC
         self.time_step += 1
-        if self.time_step >= self.conf.step_time / self.dt:
+        if self.time_step >= int(self.conf.step_time / self.dt):
             self.time_step = 0
             self.current_step += 1
+            print(f"DEBUG: Moving to next step: current_step={self.current_step}")
             if self.current_step >= len(self.footstep_traj):
+                print("DEBUG: End of footstep trajectory reached")
                 raise StopIteration("End of footstep trajectory")
+
+        # Double support phase: only remove swing foot contact after 40% of the step time
+        double_support_steps = int(0.4 * int(self.conf.step_time / self.dt))
+        if self.current_step != self.last_step:
+            self.swing_contact_removed = False
+            self.last_step = self.current_step
+        if (not getattr(self, 'swing_contact_removed', False)
+            and self.time_step >= double_support_steps
+            and self.current_step < len(self.footstep_traj)):
+            footstep = self.footstep_traj[self.current_step]
+            if footstep[0]:  # Right foot is swing
+                print(f"[CONTACT] Removing right foot contact at step {self.current_step}")
+                self.biped.removeRightFootContact()
+                self.swing_foot = 'right'
+            else:  # Left foot is swing
+                print(f"[CONTACT] Removing left foot contact at step {self.current_step}")
+                self.biped.removeLeftFootContact()
+                self.swing_foot = 'left'
+            self.swing_contact_removed = True
+        # At the end of the step, add contact back for the swing foot
+        # Add contact back earlier (at 80% of step time) for better stability
+        if self.time_step >= int(0.8 * int(self.conf.step_time / self.dt)):
+            if self.swing_foot == 'right' and not getattr(self, 'right_contact_added', False):
+                print(f"[CONTACT] Adding right foot contact at step {self.current_step}")
+                self.biped.addRightFootContact()
+                self.right_contact_added = True
+            elif self.swing_foot == 'left' and not getattr(self, 'left_contact_added', False):
+                print(f"[CONTACT] Adding left foot contact at step {self.current_step}")
+                self.biped.addLeftFootContact()
+                self.left_contact_added = True
+        # Reset contact flags at the start of each step
+        if self.time_step == 0:
+            self.right_contact_added = False
+            self.left_contact_added = False
 
         return
 
@@ -428,3 +546,25 @@ class Controller:
         ax.set_title('Footstep and DCM Trajectory')
         ax.axis('equal')
         ax.grid()
+
+    def get_support_foot(self):
+        """Determine which foot is currently in support based on the walking phase.
+        
+        Returns:
+            str: 'left', 'right', or 'both' indicating the support foot
+        """
+        if self.current_step >= len(self.footstep_traj):
+            return 'both'  # Default to both feet if no trajectory
+        
+        footstep = self.footstep_traj[self.current_step]
+        
+        # During double support phase (first 40% of step), both feet are in contact
+        double_support_steps = int(0.4 * int(self.conf.step_time / self.conf.dt))
+        if self.time_step < double_support_steps:
+            return 'both'
+        
+        # During single support phase, determine which foot is swing
+        if footstep[0]:  # Right foot is swing
+            return 'left'  # Left foot is support
+        else:  # Left foot is swing
+            return 'right'  # Right foot is support
