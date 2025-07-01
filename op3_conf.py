@@ -8,10 +8,11 @@ g = 9.81  # gravity
 z0 = 0.4  # initial height of the center of mass
 
 # Extremely conservative parameters for walking stability
-step_length = 0.01  # very small step length (1cm)
-step_height = 0.005  # very small height of the step (5mm)
-step_width = 0.1275  # width of the step
-step_time = 2.0  # longer time to complete the step
+step_length = 0.04  # Very short step length for stability (m)
+step_height = 0.005  # Extremely low foot swing height (m)
+step_width = 0.10   # Narrower width between feet (m)
+step_time = 1.5     # Even longer time per step for stability (s)
+linear_vel = 0.03   # Very slow linear velocity (m/s)
 
 # DCM controller parameters - very conservative
 k_dcm = 0.005  # very small DCM feedback gain

@@ -1,0 +1,2 @@
+2025-07-01 12:23:16.654 mjpython[83804:10898172] WARNING: Secure coding is automatically enabled for restorable state! However, not on all supported macOS versions of this application. Opt-in to secure coding explicitly by implementing NSApplicationDelegate.applicationSupportsSecureRestorableState:.
+<frozen importlib._bootstrap>:241: RuntimeWarning: to-Python converter for boost::shared_ptr<tsid::math::ConstraintBase> already registered; second conversion method ignored.

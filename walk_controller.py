@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.interpolate import CubicSpline
 import pinocchio as pin
+import matplotlib.pyplot as plt
 
 class Controller:
     """Bipedal walking controller using Divergent Component of Motion (DCM) approach.
@@ -40,12 +41,12 @@ class Controller:
         self.biped = biped
         self.conf = conf
         self.dt = conf.dt
-        self.time_step = 0
-        self.current_step = 0
+        self.time_step = -1  # Start at -1 to indicate standing phase
+        self.current_step = -1  # Start at -1 to indicate standing phase
         self.depth = 3  # Number of future steps to consider for trajectory generation
         
         # Natural frequency of the linearized inverted pendulum
-        self.w_n = np.sqrt(conf.z0 / conf.g)
+        self.w_n = np.sqrt(conf.g / conf.z0)  # Fixed: was conf.z0 / conf.g
         
         # Initialize state variables
         self.x = np.zeros(3)     # [x, y, z] CoM position
@@ -70,6 +71,9 @@ class Controller:
         self.swing_foot = None  # 'left' or 'right' or None
         self.last_step = -1
         
+        # Add walking state management
+        self.walking_started = False
+        
     def gen_footsteps(self, traj, orientation):
         """Generate footstep positions and trajectories from a reference path.
         
@@ -80,101 +84,115 @@ class Controller:
         Args:
             traj: Reference path as a numpy array of shape (n, 2) for x,y coordinates
         """
-        self.current_step = 0
+        self.current_step = -1  # Start in standing phase
         footsteps = []
-        dist = 0
-        right_foot =  True # Start with right foot
-
-        tangent = orientation
-        normal = np.array([-tangent[1], tangent[0]])
         
-        # Initial footstep positions - more conservative placement
-        left_init = np.array([-self.conf.step_width/2, 0, 0, False])  # Left foot
-        right_init = np.array([self.conf.step_width/2, 0, 0, True])   # Right foot
-        footsteps.append(left_init)
-        footsteps.append(right_init)
+        # Get current foot positions from the robot
+        data = self.biped.formulation.data()
+        current_left_foot = self.biped.robot.framePosition(data, self.biped.LF).translation
+        current_right_foot = self.biped.robot.framePosition(data, self.biped.RF).translation
+        
+        print(f"Current left foot: {current_left_foot}")
+        print(f"Current right foot: {current_right_foot}")
+        
+        # Initial foot positions (current stance)
+        initial_left_foot_pos = np.array([current_left_foot[0], current_left_foot[1], 0.0, False])
+        initial_right_foot_pos = np.array([current_right_foot[0], current_right_foot[1], 0.0, True])
+        
+        # Add initial footsteps to the list
+        footsteps.append(initial_left_foot_pos)
+        footsteps.append(initial_right_foot_pos)
 
-        # Generate discrete footstep positions with more conservative approach
-        for i in range(len(traj) - 1):
-            # Calculate path segment direction
-            dx = traj[i + 1, 0] - traj[i, 0]
-            dy = traj[i + 1, 1] - traj[i, 1]
-
-            # Accumulate distance
-            dist += np.sqrt(dx**2 + dy**2)
+        # Generate a simple forward walking pattern
+        # Start from the center between current feet
+        current_x = (current_left_foot[0] + current_right_foot[0]) / 2.0
+        current_y = (current_left_foot[1] + current_right_foot[1]) / 2.0
+        
+        # Generate simple forward walking steps
+        num_steps = 2  # Reduced from 4 to 2 for more conservative testing
+        right_foot_moving = True  # Start by moving right foot
+        
+        for i in range(num_steps):
+            # Calculate the target position for the next footstep with very conservative steps
+            target_x = current_x + (i + 1) * (self.conf.step_length * 0.5)  # Use only half the configured step length
             
-            # Place a footstep when we've traveled the step length
-            if dist >= self.conf.step_length:
-                # Calculate tangent and normal vectors to the path
-                tangent = np.array([dx, dy])
-                if np.linalg.norm(tangent) > 1e-6:
-                    tangent /= np.linalg.norm(tangent)
-                else:
-                    tangent = np.array([1.0, 0.0])  # Default forward direction
-                normal = np.array([-tangent[1], tangent[0]])  # Perpendicular to tangent
-                
-                # Create footstep: [x, y, yaw, is_right_foot]
-                footstep = np.zeros(4)
-                footstep[0] = traj[i, 0] + self.conf.step_width * normal[0] * (1 if right_foot else -1)
-                footstep[1] = traj[i, 1] + self.conf.step_width * normal[1] * (1 if right_foot else -1)
-                footstep[2] = np.arctan2(tangent[1], tangent[0])  # Yaw angle
-                footstep[3] = right_foot
-                footsteps.append(footstep)
-                
-                # Reset distance and alternate feet
-                dist = 0
-                right_foot = not right_foot
-    
-        # Generate smooth trajectories between footsteps with better constraints
+            if right_foot_moving:
+                # Right foot moves forward
+                target_y = current_y - self.conf.step_width / 2.0
+            else:
+                # Left foot moves forward
+                target_y = current_y + self.conf.step_width / 2.0
+            
+            # Create footstep: [x, y, yaw, is_right_foot]
+            footstep = np.zeros(4)
+            footstep[0] = target_x
+            footstep[1] = target_y
+            footstep[2] = 0.0  # No yaw change
+            footstep[3] = right_foot_moving
+            
+            footsteps.append(footstep)
+            
+            right_foot_moving = not right_foot_moving
+            
+        # Generate smooth trajectories between footsteps
         footstep_traj = []
         num_points = int(self.conf.step_time / self.conf.dt)
-        t = np.linspace(0, 1, num_points)
+        t_interp = np.linspace(0, 1, num_points)
         
-        for i in range(len(footsteps) - 2):
-            p0 = footsteps[i][:2]    # Start position (x,y)
-            p1 = footsteps[i + 2][:2]  # End position (x,y)
+        # Create trajectories for each step (skipping the initial stance)
+        for i in range(2, len(footsteps)):  # Start from index 2 (first actual step)
+            # Determine which foot is moving and where it starts
+            moving_foot_target = footsteps[i]
+            is_right_foot = bool(moving_foot_target[3])
             
-            # Limit maximum step distance for stability
-            step_dist = np.linalg.norm(p1 - p0)
-            if step_dist > 0.05:  # More conservative step distance limit
-                direction = (p1 - p0) / step_dist
-                p1 = p0 + 0.05 * direction
+            if is_right_foot:
+                # Right foot is moving, it starts from its current position
+                start_pos = current_right_foot[:2]
+            else:
+                # Left foot is moving, it starts from its current position  
+                start_pos = current_left_foot[:2]
             
-            # Create cubic spline for x-y trajectory
-            t_spline = np.array([0, 1])
-            x_control = np.array([p0[0], p1[0]])
-            y_control = np.array([p0[1], p1[1]])
+            end_pos = moving_foot_target[:2]
             
-            x_traj = CubicSpline(t_spline, x_control)(t)
-            y_traj = CubicSpline(t_spline, y_control)(t)
+            print(f"Step {i-2}: {'Right' if is_right_foot else 'Left'} foot from {start_pos} to {end_pos}")
             
-            # Create smoother height profile for better foot clearance
-            z_traj = 4 * self.conf.step_height * t * (1 - t)
-
+            # Create simple linear trajectory with modest step height
+            x_traj = np.linspace(start_pos[0], end_pos[0], num_points)
+            y_traj = np.linspace(start_pos[1], end_pos[1], num_points)
+            
+            # Simple parabolic height profile with lower maximum height
+            z_traj = np.zeros(num_points)
+            for j in range(num_points):
+                # Parabolic height profile: max height at middle of step
+                t_norm = j / (num_points - 1)
+                z_traj[j] = 4 * self.conf.step_height * t_norm * (1 - t_norm)
+            
             # Create homogeneous transformation matrices for each point
             HTM = []
-            yaw = footsteps[i + 1][2]  # Use the yaw of the intermediate footstep
             for j in range(num_points):
-                # Create rotation matrix from yaw angle
                 T = np.eye(4)
-                R = np.array([
-                    [np.cos(yaw), -np.sin(yaw), 0],
-                    [np.sin(yaw), np.cos(yaw), 0],
-                    [0, 0, 1]
-                ])
-                T[:3, :3] = R
+                # No rotation for now
                 T[:3, 3] = [x_traj[j], y_traj[j], z_traj[j]]
                 HTM.append(T)
 
-            footstep_traj.append((footsteps[i][3], HTM))
+            footstep_traj.append((is_right_foot, HTM))
+            
+            # Update current foot positions for next iteration
+            if is_right_foot:
+                current_right_foot = np.array([end_pos[0], end_pos[1], 0.0])
+            else:
+                current_left_foot = np.array([end_pos[0], end_pos[1], 0.0])
 
         self.footstep_traj = footstep_traj
         self.footsteps = footsteps
 
-        # Print first 10 footsteps for debugging
-        print("First 10 footsteps:")
-        for i in range(min(10, len(footsteps))):
-            print(footsteps[i])
+        # Print footsteps for debugging
+        print("Generated footsteps:")
+        for i, footstep in enumerate(footsteps):
+            side = "Right" if footstep[3] else "Left"
+            print(f"  {i}: {side} foot at ({footstep[0]:.3f}, {footstep[1]:.3f})")
+        
+        print(f"Generated {len(footstep_traj)} footstep trajectories")
 
         return footsteps
 
@@ -244,44 +262,65 @@ class Controller:
         self.x = current_com
         self.dx = current_com_vel
         
-        # Compute current DCM (ξ = x + ẋ/ω)
+        # Compute current DCM (ξ = x + ẋ/ω)
         self.e = self.x + self.dx / self.w_n
         
-        # Very conservative DCM feedback control law:
-        com_ref = dcm_ref.copy()
-        com_ref = np.array([dcm_ref[0], dcm_ref[1], self.conf.z0])  # Keep height constant
+        # DCM feedback control law with VERY conservative gains
+        dcm_error = dcm_ref - self.e[:2]  # Only use x,y components
         
-        # Very conservative damping - stay close to current position
-        damping_factor_x = 0.1  # Very small movement in x
-        damping_factor_y = 0.05  # Very small movement in y
-        com_ref[0] = damping_factor_x * com_ref[0] + (1 - damping_factor_x) * self.x[0]
-        com_ref[1] = damping_factor_y * com_ref[1] + (1 - damping_factor_y) * self.x[1]
+        # VERY conservative gains for DCM control
+        k_dcm = 0.5  # Reduced from 5.0 to 0.5 for stability
+        
+        # Calculate desired DCM velocity to track reference
+        dcm_vel_des = k_dcm * dcm_error
+        
+        # Limit DCM velocity to prevent large movements
+        max_dcm_vel = 0.05  # Very conservative limit (5cm/s)
+        dcm_vel_des = np.clip(dcm_vel_des, -max_dcm_vel, max_dcm_vel)
+        
+        # Very simple and conservative CoM reference calculation
+        # Just move the CoM slightly towards the DCM reference
+        com_ref = np.zeros(3)
+        
+        # Very small movements in x,y to track DCM
+        com_ref[:2] = self.x[:2] + 0.1 * dcm_error  # Move 10% towards target
         com_ref[2] = self.conf.z0  # Keep height constant
         
-        # Very conservative velocity and acceleration
+        # Apply extremely conservative limits to prevent large movements
+        max_com_change = 0.002  # Maximum CoM movement per step (2mm)
+        com_change = com_ref - self.x
+        
+        for i in range(2):  # Only limit x,y movement
+            if abs(com_change[i]) > max_com_change:
+                com_change[i] = np.sign(com_change[i]) * max_com_change
+                com_ref[i] = self.x[i] + com_change[i]
+        
+        # Very conservative velocity reference
         com_vel_ref = np.zeros(3)
-        com_vel_ref[0] = (com_ref[0] - self.x[0]) * 0.5  # Very small gains
-        com_vel_ref[1] = (com_ref[1] - self.x[1]) * 0.5
-        com_vel_ref[2] = (com_ref[2] - self.x[2]) * 1.0
+        com_vel_ref[:2] = dcm_vel_des
+        com_vel_ref[2] = 0.0  # No vertical velocity
         
-        com_acc_ref = np.zeros(3)
-        com_acc_ref[0] = (com_vel_ref[0] - self.dx[0]) * 0.5
-        com_acc_ref[1] = (com_vel_ref[1] - self.dx[1]) * 0.5
-        com_acc_ref[2] = (com_vel_ref[2] - self.dx[2]) * 1.0
+        # Limit velocity as well
+        max_com_vel = 0.02  # Very conservative velocity (2cm/s)
+        for i in range(2):
+            if abs(com_vel_ref[i]) > max_com_vel:
+                com_vel_ref[i] = np.sign(com_vel_ref[i]) * max_com_vel
         
-        # Rate limit the CoM reference to prevent any large jumps
-        max_com_change = 0.001  # Very small rate limit
+        # Conservative acceleration (mostly zero for stability)
+        com_acc_des = np.zeros(3)
+        
+        # Rate limit the CoM reference to prevent discontinuities
         if hasattr(self, 'prev_com_ref') and self.prev_com_ref is not None:
-            com_change = com_ref - self.prev_com_ref
-            # Apply rate limit to all components
+            max_rate_change = 0.001  # Very conservative rate limit (1mm per step)
+            ref_change = com_ref - self.prev_com_ref
             for i in range(3):
-                if abs(com_change[i]) > max_com_change:
-                    com_change[i] = np.sign(com_change[i]) * max_com_change
-                    com_ref[i] = self.prev_com_ref[i] + com_change[i]
+                if abs(ref_change[i]) > max_rate_change:
+                    ref_change[i] = np.sign(ref_change[i]) * max_rate_change
+                    com_ref[i] = self.prev_com_ref[i] + ref_change[i]
         
         self.prev_com_ref = com_ref.copy()
         
-        com = np.array([com_ref, com_vel_ref, com_acc_ref])
+        com = np.array([com_ref, com_vel_ref, com_acc_des])
         F_ext = np.zeros(3)
         return com, F_ext
     
@@ -352,16 +391,23 @@ class Controller:
         This method is called at each simulation step to update the controller
         state and compute the next control commands for the biped robot.
         """
-        # Only generate DCM trajectory at the start
-        if not self.dcm_traj:
+        # If walking hasn't started yet, stay in standing phase
+        if not self.walking_started:
+            return
+            
+        # Only generate DCM trajectory at the start if not already generated
+        if not self.dcm_traj and self.footsteps:
+            print("Generating DCM trajectory...")
             self.gen_dcm_traj()
         
         # Debug prints to understand the issue
         print(f"DEBUG: current_step={self.current_step}, time_step={self.time_step}")
         print(f"DEBUG: len(dcm_traj)={len(self.dcm_traj)}, len(footstep_traj)={len(self.footstep_traj)}")
         
-        # Get current DCM and ZMP references with bounds checking
-        if (self.current_step < len(self.dcm_traj) and 
+        # Check if we have valid trajectories and indices
+        if (self.current_step >= 0 and 
+            self.current_step < len(self.dcm_traj) and 
+            self.time_step >= 0 and
             self.time_step < len(self.dcm_traj[self.current_step]) and 
             self.current_step < len(self.footstep_traj)):
             
@@ -371,7 +417,13 @@ class Controller:
             # Get current robot state for VRP calculation
             data = self.biped.formulation.data()
             current_com = self.biped.robot.com(data)
-            vrp_ref = current_com + np.array([0, 0, self.conf.z0])
+            
+            # VRP should be the current support footstep position (ZMP)
+            if self.current_step < len(self.footsteps):
+                vrp_ref = self.footsteps[self.current_step][:2]  # Use current footstep as ZMP
+            else:
+                # Fallback to CoM x,y position if no footstep available
+                vrp_ref = current_com[:2]
             
             # Calculate DCM feedback control
             com_control, F_ext = self.dcm_controller(dcm_ref, vrp_ref)
@@ -379,14 +431,7 @@ class Controller:
             # Debug: Print CoM reference and actual CoM
             print(f"DEBUG: CoM reference: {com_control[0]}")
             print(f"DEBUG: Actual CoM: {self.x}")
-            # Debug: Print foot references
-            if self.current_step < len(self.footstep_traj):
-                footstep = self.footstep_traj[self.current_step]
-                if self.time_step < len(footstep[1]):
-                    foot_transform = footstep[1][self.time_step]
-                    print(f"DEBUG: Foot reference (current step): {foot_transform[:3, 3]}")
-            # Debug: Print QP solver status (will be printed in main loop as well)
-
+            
             # Set CoM task references using the correct TSID API
             self.biped.sample_com.value(com_control[0])
             self.biped.sample_com.derivative(com_control[1])
@@ -409,9 +454,9 @@ class Controller:
                         foot_distance = np.linalg.norm(foot_pos - current_foot_pos)
                         
                         # If foot position is too far, use a closer position
-                        max_foot_distance = 0.02  # More conservative maximum reasonable foot movement
+                        max_foot_distance = 0.05  # Very conservative maximum foot movement (5cm)
                         if foot_distance > max_foot_distance:
-                            print(f"Warning: Foot position too far ({foot_distance:.3f}m), limiting movement")
+                            print(f"Foot position too far ({foot_distance:.3f}m), limiting movement")
                             direction = (foot_pos - current_foot_pos) / foot_distance
                             foot_pos = current_foot_pos + direction * max_foot_distance
                             foot_transform[:3, 3] = foot_pos
@@ -430,9 +475,9 @@ class Controller:
                         foot_distance = np.linalg.norm(foot_pos - current_foot_pos)
                         
                         # If foot position is too far, use a closer position
-                        max_foot_distance = 0.02  # More conservative maximum reasonable foot movement
+                        max_foot_distance = 0.05  # Very conservative maximum foot movement (5cm)
                         if foot_distance > max_foot_distance:
-                            print(f"Warning: Foot position too far ({foot_distance:.3f}m), limiting movement")
+                            print(f"Foot position too far ({foot_distance:.3f}m), limiting movement")
                             direction = (foot_pos - current_foot_pos) / foot_distance
                             foot_pos = current_foot_pos + direction * max_foot_distance
                             foot_transform[:3, 3] = foot_pos
@@ -444,12 +489,14 @@ class Controller:
                 print(f"Warning: Error setting foot trajectory: {e}")
                 # Continue with current foot positions if trajectory setting fails
         else:
-            print(f"DEBUG: Skipping update - bounds check failed")
+            print(f"DEBUG: Skipping update - bounds check failed or walking not started")
+            print(f"DEBUG: walking_started={self.walking_started}")
             print(f"DEBUG: current_step={self.current_step}, time_step={self.time_step}")
             print(f"DEBUG: len(dcm_traj)={len(self.dcm_traj)}")
-            if self.current_step < len(self.dcm_traj):
+            if self.current_step >= 0 and self.current_step < len(self.dcm_traj):
                 print(f"DEBUG: len(dcm_traj[{self.current_step}])={len(self.dcm_traj[self.current_step])}")
             print(f"DEBUG: len(footstep_traj)={len(self.footstep_traj)}")
+            return  # Don't update step counters if not walking properly
 
         # Update current step index - FIXED LOGIC
         self.time_step += 1
@@ -459,7 +506,8 @@ class Controller:
             print(f"DEBUG: Moving to next step: current_step={self.current_step}")
             if self.current_step >= len(self.footstep_traj):
                 print("DEBUG: End of footstep trajectory reached")
-                raise StopIteration("End of footstep trajectory")
+                self.walking_started = False  # Stop walking
+                return
 
         # Double support phase: only remove swing foot contact after 40% of the step time
         double_support_steps = int(0.4 * int(self.conf.step_time / self.dt))
@@ -568,3 +616,24 @@ class Controller:
             return 'left'  # Left foot is support
         else:  # Left foot is swing
             return 'right'  # Right foot is support
+
+    def start_walking(self):
+        """Initialize the walking controller and start the first step."""
+        print("Starting walking controller...")
+        
+        # Generate trajectories if not already done
+        if not self.footstep_traj:
+            print("Warning: No footstep trajectory found. Cannot start walking.")
+            return False
+            
+        if not self.dcm_traj:
+            print("Warning: No DCM trajectory found. Cannot start walking.")
+            return False
+        
+        # Start the walking state machine
+        self.time_step = 0
+        self.current_step = 0
+        self.walking_started = True
+        
+        print(f"Walking started with {len(self.footstep_traj)} steps")
+        return True

@@ -14,37 +14,38 @@ from biped import Biped
 from walk_controller import Controller
 
 def map_tsid_to_mujoco(q_tsid):
-    """Map TSID joint positions to MuJoCo control signals."""
-    ctrl = np.zeros(20)  # MuJoCo expects 20 actuators
+    """Map TSID joint positions to MuJoCo position control signals.
     
-    # Map the 18 actuated joints from TSID to MuJoCo
-    ctrl[0] = q_tsid[22]  # right shoulder pitch
-    ctrl[1] = q_tsid[23]  # right shoulder roll
-    ctrl[2] = q_tsid[24]  # right elbow
+    This uses the EXACT same approach as biped_balance.py - direct position control!
+    Much more stable than trying to compute torques manually.
+    """
+    ctrl = np.zeros(20)
+    
+    # Use the exact same mapping as biped_balance.py
+    ctrl[0] = q_tsid[22] # right shoulder pitch
+    ctrl[1] = q_tsid[23] # right shoulder roll
+    ctrl[2] = q_tsid[24] # right elbow
 
-    ctrl[3] = q_tsid[14]  # left shoulder pitch
-    ctrl[4] = q_tsid[15]  # left shoulder roll
-    ctrl[5] = q_tsid[16]  # left elbow
+    ctrl[3] = q_tsid[14] # left shoulder pitch
+    ctrl[4] = q_tsid[15] # left shoulder roll
+    ctrl[5] = q_tsid[16] # left elbow
 
-    ctrl[6] = q_tsid[7]   # head yaw
-    ctrl[7] = q_tsid[8]   # head pitch
+    ctrl[6] = q_tsid[7] # head yaw
+    ctrl[7] = q_tsid[8] # head pitch
 
-    ctrl[8] = q_tsid[17]  # right hip pitch
-    ctrl[9] = q_tsid[18]  # right hip roll
+    ctrl[8] = q_tsid[17] # right hip pitch
+    ctrl[9] = q_tsid[18] # right hip roll
     ctrl[10] = q_tsid[19] # right hip yaw
     ctrl[11] = q_tsid[20] # right knee
     ctrl[12] = q_tsid[21] # right ankle pitch
 
-    ctrl[13] = q_tsid[9]  # left hip pitch
+    ctrl[13] = q_tsid[9] # left hip pitch
     ctrl[14] = q_tsid[10] # left hip roll
     ctrl[15] = q_tsid[11] # left hip yaw
     ctrl[16] = q_tsid[12] # left knee
     ctrl[17] = q_tsid[13] # left ankle pitch
-    
-    # The last two actuators (18, 19) are likely ankle roll joints
-    # Set them to 0 for now (they might not be used in this model)
-    ctrl[18] = 0.0  # right ankle roll (if exists)
-    ctrl[19] = 0.0  # left ankle roll (if exists)
+    ctrl[18] = 0.0
+    ctrl[19] = 0.0
 
     return ctrl
 
@@ -95,27 +96,20 @@ def run_walking_simulation():
     mj_data = mujoco.MjData(mj_model)
     mj_model.opt.timestep = conf.dt
     
-    # Initialize simulation state - ensure proper initial position
+    # Initialize simulation state - use natural Biped configuration 
+    # 🔧 FIXED: Use the natural joint configuration from Biped class (like biped_balance.py)
+    # DON'T override with zeros - the Biped class sets up a proper standing pose!
     q, v = biped.q, biped.v
     
-    # First, set the robot to a proper standing configuration
-    # Set initial velocities to zero for stability
+    # Only set initial velocities to zero for stability
     v = np.zeros_like(v)
     
-    # Set initial joint positions to a standing pose
-    # This should be a stable standing configuration
-    # The robot has 20 actuated joints (indices 7-26)
-    q[7:27] = np.array([0.0, 0.0,  # head (2 joints)
-                        0.0, 0.0, 0.0, 0.0, 0.0,  # left leg (5 joints) - standing pose
-                        0.0, 0.0, 0.0,  # left arm (3 joints)
-                        0.0, 0.0, 0.0, 0.0, 0.0,  # right leg (5 joints) - standing pose
-                        0.0, 0.0, 0.0, 0.0, 0.0])  # right arm (5 joints)
+    print(f"🔧 Using natural Biped joint configuration (not forcing zeros)")
+    print(f"   First 10 joint positions: {q[:10]}")
+    print(f"   Joint positions 7-16 (first 10 actuated): {q[7:17]}")
     
-    # Ensure the robot is properly oriented (upright)
-    q[3] = 1.0  # quaternion w component (upright orientation)
-    q[4] = 0.0  # quaternion x component
-    q[5] = 0.0  # quaternion y component
-    q[6] = 0.0  # quaternion z component
+    # Keep the natural joint configuration - don't override anything!
+    # The Biped class already sets up a proper standing pose
     
     # Set initial velocities to zero
     mj_data.qpos = q
@@ -142,13 +136,19 @@ def run_walking_simulation():
     q[0] = feet_center[0]  # Set x position to center between feet
     q[1] = feet_center[1]  # Set y position to center between feet
     
-    # Set the base height so that the feet are on the ground
-    # Find the lowest foot height and set base height accordingly
+    # 🔧 FIXED: Use proper foot-on-ground initialization (same as biped_balance.py)
+    # Instead of forcing a specific CoM height, place feet on ground and accept natural CoM height
+    print(f"🔧 PROPER INITIALIZATION (like biped_balance.py):")
+    print(f"   Current base height q[2]: {q[2]:.6f}")
+    print(f"   Current foot heights: L={left_foot_0[2]:.6f}, R={right_foot_0[2]:.6f}")
+    
+    # Place feet on ground (same approach as biped_balance.py)
     min_foot_height = min(left_foot_0[2], right_foot_0[2])
-    # The base height should be set so that the lowest foot is at ground level (z=0)
-    # If min_foot_height is positive, we need to lower the base
-    # If min_foot_height is negative, we need to raise the base
-    q[2] = q[2] - min_foot_height  # Adjust base height to place feet on ground
+    q[2] = q[2] - min_foot_height  # This puts the lowest foot on the ground
+    
+    print(f"   Min foot height: {min_foot_height:.6f}")
+    print(f"   Adjusted base height to: {q[2]:.6f}")
+    print(f"   This will result in feet at ground level and natural CoM height")
     
     # Update MuJoCo state with the corrected position
     mj_data.qpos = q
@@ -166,12 +166,17 @@ def run_walking_simulation():
     right_foot_0 = biped.robot.framePosition(biped.formulation.data(), biped.RF).translation
     feet_center = (left_foot_0 + right_foot_0) / 2.0
     
-    print(f"Initial CoM: {com_0}")
+    print("=" * 60)
+    print("🔍 FINAL INITIALIZATION RESULTS")
+    print("=" * 60)
+    print(f"Natural CoM position: {com_0}")
     print(f"Left foot: {left_foot_0}")
     print(f"Right foot: {right_foot_0}")
     print(f"Feet center: {feet_center}")
-    print(f"Initial q[0:3]: {q[0:3]}")  # Base position
+    print(f"Base position q[0:3]: {q[0:3]}")
     print(f"Feet on ground: Left={left_foot_0[2]:.6f}, Right={right_foot_0[2]:.6f}")
+    print(f"✅ Using natural CoM height: {com_0[2]:.6f}m (no forced height)")
+    print("=" * 60)
     
     # Initialize problem data
     i, t = 0, 0.0
@@ -205,8 +210,16 @@ def run_walking_simulation():
                     
                 t_elapsed = time.time() - start_time
                 
-                # Keep CoM at initial position during standing
-                com_ref = com_0.copy()
+                # 🔧 FIXED: Hold natural CoM position (same as biped_balance.py)
+                # Don't try to force a specific height - just hold the natural position from initialization
+                com_ref = com_0.copy()  # Hold the natural CoM position
+                
+                # 🔍 DEBUG: Print detailed info for first few steps
+                if stand_i < 5:
+                    print(f"\n🔍 STEP {stand_i} DEBUG:")
+                    print(f"   Holding natural CoM position: {com_ref}")
+                    print(f"   No height ramping - accept the natural height from foot-on-ground init")
+                
                 biped.sample_com.value(com_ref)
                 biped.sample_com.derivative(np.zeros(3))
                 biped.sample_com.second_derivative(np.zeros(3))
@@ -221,18 +234,41 @@ def run_walking_simulation():
                 sol = biped.solver.solve(HQPData)
                 
                 if sol.status != 0:
-                    print(f"QP problem could not be solved! Error code: {sol.status}")
+                    print(f"❌ QP problem could not be solved! Error code: {sol.status}")
                     break
                 
                 dv = biped.formulation.getAccelerations(sol)
+                
+                # 🔍 DEBUG: Print control info for first few steps  
+                if stand_i < 5:
+                    print(f"   QP status: {sol.status}")
+                    print(f"   Computed accelerations (first 5): {dv[:5]}")
+                    print(f"   Current velocities (first 5): {v[:5]}")
+                    print(f"   Current positions (first 5): {q[:5]}")
+                
                 q, v = biped.integrate_dv(q, v, dv, conf.dt)
                 i, t = i + 1, t + conf.dt
                 
+                # 🔧 FIXED: Use simple position control like biped_balance.py  
+                # This sends joint positions directly to MuJoCo - much more stable!
                 mj_data.ctrl = map_tsid_to_mujoco(q)
                 mujoco.mj_step(mj_model, mj_data)
                 
                 com_true = biped.robot.com(biped.formulation.data())
                 true_com_log.append(com_true.copy())
+                
+                # 🔍 DEBUG: Print result for first few steps
+                if stand_i < 5:
+                    print(f"   Result CoM: {com_true}")
+                    print(f"   CoM height change: {com_true[2] - com_ref[2]:.6f}")
+                    if abs(com_true[2] - com_ref[2]) > 0.01:
+                        print(f"   ⚠️  WARNING: Large CoM height deviation!")
+                        
+                    # Check base position changes
+                    base_change = np.linalg.norm(q[:3] - mj_data.qpos[:3])
+                    if base_change > 0.01:
+                        print(f"   ⚠️  WARNING: Large base position change: {base_change:.6f}")
+                    print(f"   ---")
                 
                 # Get foot positions for logging
                 left_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.LF).translation
@@ -257,126 +293,137 @@ def run_walking_simulation():
             
             print("PHASE 2: Starting walking phase...")
             # PHASE 2: Walking phase - very conservative
-            while viewer.is_running():
-                t_elapsed = time.time() - start_time
-                try:
-                    # Update the controller first to generate fresh trajectories
-                    controller.update()
-                    
-                    # Now get the references from the controller
-                    sample = controller.biped.trajCom.getSample(t)
-                    com_ref = sample.value()
-                    com_vel_ref = sample.derivative()
-                    com_acc_ref = sample.second_derivative()
-
-                    biped.sample_com.value(com_ref)
-                    biped.sample_com.derivative(com_vel_ref)
-                    biped.sample_com.second_derivative(com_acc_ref)
-                    biped.trajCom.setReference(com_ref)
-                    
-                    foot_distance = None
-                    warning = ''
-                    foot_ref = [None, None, None]
-                    
-                    # Set foot references if available
-                    if controller.current_step < len(controller.footstep_traj):
-                        footstep = controller.footstep_traj[controller.current_step]
-                        if footstep[0]:  # Right foot
-                            if controller.time_step < len(footstep[1]):
-                                foot_transform = footstep[1][controller.time_step]
-                                foot_ref = foot_transform[:3, 3]
-                                current_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.RF).translation
-                                foot_distance = float(np.linalg.norm(foot_ref - current_foot_pos))
-                                if foot_distance > 0.05:  # Very conservative limit
-                                    warning = f'Foot position too far ({foot_distance:.3f}m), limiting movement'
-                                    # Don't move foot if too far
-                                    foot_ref = current_foot_pos
-                                else:
-                                    biped.trajRF.setReference(pin.SE3(foot_transform))
-                                    biped.rightFootTask.setReference(biped.trajRF.computeNext())
-                        else:  # Left foot
-                            if controller.time_step < len(footstep[1]):
-                                foot_transform = footstep[1][controller.time_step]
-                                foot_ref = foot_transform[:3, 3]
-                                current_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.LF).translation
-                                foot_distance = float(np.linalg.norm(foot_ref - current_foot_pos))
-                                if foot_distance > 0.05:  # Very conservative limit
-                                    warning = f'Foot position too far ({foot_distance:.3f}m), limiting movement'
-                                    # Don't move foot if too far
-                                    foot_ref = current_foot_pos
-                                else:
-                                    biped.trajLF.setReference(pin.SE3(foot_transform))
-                                    biped.leftFootTask.setReference(biped.trajLF.computeNext())
-                    
-                    # Set task references
-                    biped.comTask.setReference(biped.trajCom.computeNext())
-                    biped.postureTask.setReference(biped.trajPosture.computeNext())
-                    
-                    # Solve QP problem
-                    HQPData = biped.formulation.computeProblemData(t, q, v)
-                    sol = biped.solver.solve(HQPData)
-                    
-                    if sol.status != 0:
-                        print(f"QP problem could not be solved! Error code: {sol.status}")
-                        print("Continuing with previous solution...")
-                        if i > 0:
-                            pass  # Continue with previous solution
-                        else:
-                            break
-                    
-                    dv = biped.formulation.getAccelerations(sol)
-                    
-                    # Very conservative velocity limits
-                    max_vel = 5.0  # Increased maximum velocity
-                    if np.linalg.norm(v) > max_vel:
-                        v = v * max_vel / np.linalg.norm(v)
-                    
-                    q, v = biped.integrate_dv(q, v, dv, conf.dt)
-                    i, t = i + 1, t + conf.dt
-                    
-                    mj_data.ctrl = map_tsid_to_mujoco(q)
-                    mujoco.mj_step(mj_model, mj_data)
-                    
-                    com_true = biped.robot.com(biped.formulation.data())
-                    true_com_log.append(com_true.copy())
-                    
-                    # Get foot positions for logging
-                    left_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.LF).translation
-                    right_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.RF).translation
-                    
-                    # Calculate errors for logging
-                    com_y_error = com_ref[1] - com_true[1] if len(com_ref) > 1 else 0.0
-                    com_y_vel = com_vel_ref[1] if len(com_vel_ref) > 1 and com_vel_ref is not None else 0.0
-                    com_y_acc = com_acc_ref[1] if len(com_acc_ref) > 1 and com_acc_ref is not None else 0.0
-                    support_foot = controller.get_support_foot()
-                    
-                    # Log data
-                    csvwriter.writerow([
-                        i, t_elapsed, controller.current_step, controller.time_step,
-                        com_ref[0], com_ref[1], com_ref[2],
-                        com_true[0], com_true[1], com_true[2],
-                        foot_ref[0] if foot_ref[0] is not None else 0.0,
-                        foot_ref[1] if foot_ref[1] is not None else 0.0,
-                        foot_ref[2] if foot_ref[2] is not None else 0.0,
-                        left_foot_pos[0], left_foot_pos[1], left_foot_pos[2],
-                        right_foot_pos[0], right_foot_pos[1], right_foot_pos[2],
-                        sol.status, foot_distance if foot_distance is not None else 0.0, warning,
-                        com_y_error, com_y_vel, com_y_acc, support_foot
-                    ])
-                    
-                    viewer.sync()
-                    
-                    # Print status every 500 steps (1 second)
-                    if i % 500 == 0:
-                        print(f"Step {i}, Time: {t:.2f}s, CoM: {com_true}, QP Status: {sol.status}")
+            
+            # Start the walking controller
+            walking_started = controller.start_walking()
+            if walking_started:
+                while viewer.is_running():
+                    t_elapsed = time.time() - start_time
+                    try:
+                        # Update the controller first to generate fresh trajectories
+                        controller.update()
                         
-                except StopIteration:
-                    print("Walking trajectory completed!")
-                    break
-                except Exception as e:
-                    print(f"Error in walking simulation: {e}")
-                    print("Continuing simulation...")
-                    continue
+                        # If walking has stopped, break out of loop
+                        if not controller.walking_started:
+                            print("Walking completed!")
+                            break
+                        
+                        # Now get the references from the controller
+                        sample = controller.biped.trajCom.getSample(t)
+                        com_ref = sample.value()
+                        com_vel_ref = sample.derivative()
+                        com_acc_ref = sample.second_derivative()
+
+                        biped.sample_com.value(com_ref)
+                        biped.sample_com.derivative(com_vel_ref)
+                        biped.sample_com.second_derivative(com_acc_ref)
+                        biped.trajCom.setReference(com_ref)
+                        
+                        foot_distance = None
+                        warning = ''
+                        foot_ref = [None, None, None]
+                        
+                        # Set foot references if available
+                        if controller.current_step < len(controller.footstep_traj):
+                            footstep = controller.footstep_traj[controller.current_step]
+                            if footstep[0]:  # Right foot
+                                if controller.time_step < len(footstep[1]):
+                                    foot_transform = footstep[1][controller.time_step]
+                                    foot_ref = foot_transform[:3, 3]
+                                    current_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.RF).translation
+                                    foot_distance = float(np.linalg.norm(foot_ref - current_foot_pos))
+                                    if foot_distance > 0.05:  # Very conservative limit
+                                        warning = f'Foot position too far ({foot_distance:.3f}m), limiting movement'
+                                        # Don't move foot if too far
+                                        foot_ref = current_foot_pos
+                                    else:
+                                        biped.trajRF.setReference(pin.SE3(foot_transform))
+                                        biped.rightFootTask.setReference(biped.trajRF.computeNext())
+                            else:  # Left foot
+                                if controller.time_step < len(footstep[1]):
+                                    foot_transform = footstep[1][controller.time_step]
+                                    foot_ref = foot_transform[:3, 3]
+                                    current_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.LF).translation
+                                    foot_distance = float(np.linalg.norm(foot_ref - current_foot_pos))
+                                    if foot_distance > 0.05:  # Very conservative limit
+                                        warning = f'Foot position too far ({foot_distance:.3f}m), limiting movement'
+                                        # Don't move foot if too far
+                                        foot_ref = current_foot_pos
+                                    else:
+                                        biped.trajLF.setReference(pin.SE3(foot_transform))
+                                        biped.leftFootTask.setReference(biped.trajLF.computeNext())
+                        
+                        # Set task references
+                        biped.comTask.setReference(biped.trajCom.computeNext())
+                        biped.postureTask.setReference(biped.trajPosture.computeNext())
+                        
+                        # Solve QP problem
+                        HQPData = biped.formulation.computeProblemData(t, q, v)
+                        sol = biped.solver.solve(HQPData)
+                        
+                        if sol.status != 0:
+                            print(f"QP problem could not be solved! Error code: {sol.status}")
+                            print("Continuing with previous solution...")
+                            if i > 0:
+                                pass  # Continue with previous solution
+                            else:
+                                break
+                        
+                        dv = biped.formulation.getAccelerations(sol)
+                        
+                        # Very conservative velocity limits
+                        max_vel = 5.0  # Increased maximum velocity
+                        if np.linalg.norm(v) > max_vel:
+                            v = v * max_vel / np.linalg.norm(v)
+                        
+                        q, v = biped.integrate_dv(q, v, dv, conf.dt)
+                        i, t = i + 1, t + conf.dt
+                        
+                        mj_data.ctrl = map_tsid_to_mujoco(q)
+                        mujoco.mj_step(mj_model, mj_data)
+                        
+                        com_true = biped.robot.com(biped.formulation.data())
+                        true_com_log.append(com_true.copy())
+                        
+                        # Get foot positions for logging
+                        left_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.LF).translation
+                        right_foot_pos = biped.robot.framePosition(biped.formulation.data(), biped.RF).translation
+                        
+                        # Calculate errors for logging
+                        com_y_error = com_ref[1] - com_true[1] if len(com_ref) > 1 else 0.0
+                        com_y_vel = com_vel_ref[1] if len(com_vel_ref) > 1 and com_vel_ref is not None else 0.0
+                        com_y_acc = com_acc_ref[1] if len(com_acc_ref) > 1 and com_acc_ref is not None else 0.0
+                        support_foot = controller.get_support_foot()
+                        
+                        # Log data
+                        csvwriter.writerow([
+                            i, t_elapsed, controller.current_step, controller.time_step,
+                            com_ref[0], com_ref[1], com_ref[2],
+                            com_true[0], com_true[1], com_true[2],
+                            foot_ref[0] if foot_ref[0] is not None else 0.0,
+                            foot_ref[1] if foot_ref[1] is not None else 0.0,
+                            foot_ref[2] if foot_ref[2] is not None else 0.0,
+                            left_foot_pos[0], left_foot_pos[1], left_foot_pos[2],
+                            right_foot_pos[0], right_foot_pos[1], right_foot_pos[2],
+                            sol.status, foot_distance if foot_distance is not None else 0.0, warning,
+                            com_y_error, com_y_vel, com_y_acc, support_foot
+                        ])
+                        
+                        viewer.sync()
+                        
+                        # Print status every 500 steps (1 second)
+                        if i % 500 == 0:
+                            print(f"Step {i}, Time: {t:.2f}s, CoM: {com_true}, QP Status: {sol.status}")
+                            
+                    except StopIteration:
+                        print("Walking trajectory completed!")
+                        break
+                    except Exception as e:
+                        print(f"Error in walking simulation: {e}")
+                        print("Continuing simulation...")
+                        continue
+            else:
+                print("Failed to start walking controller!")
         
         # Keep viewer open for a moment after simulation ends
         while viewer.is_running():
