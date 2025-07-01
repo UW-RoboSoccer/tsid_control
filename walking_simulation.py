@@ -2,6 +2,8 @@ import mujoco.viewer
 import mujoco
 import numpy as np
 import time
+import matplotlib
+matplotlib.use('Agg') # Use a non-interactive backend
 import matplotlib.pyplot as plt
 from scipy.interpolate import CubicSpline
 import pinocchio as pin
@@ -72,7 +74,7 @@ def run_walking_simulation():
     
     # Generate walking path with very conservative parameters
     print("Generating walking path...")
-    traj = generate_walking_path(linear_vel=0.02, angular_vel=0.0, duration=3.0, dt=conf.dt)  # Much slower walking
+    traj = generate_walking_path(linear_vel=conf.linear_vel, angular_vel=0.0, duration=3.0, dt=conf.dt)  # Use linear_vel from conf
     initial_orientation = np.array([1.0, 0.0])  # Forward direction
     
     # Generate footstep trajectory
@@ -122,6 +124,13 @@ def run_walking_simulation():
     # Step MuJoCo once to update the model state
     mujoco.mj_step(mj_model, mj_data)
     
+    # Update q and v from MuJoCo data after the step
+    q = mj_data.qpos.copy()
+    v = mj_data.qvel.copy()
+    
+    # Update the pinocchio model data
+    biped.formulation.computeProblemData(0.0, q, v)
+    
     # Now get the actual foot positions after setting the joint configuration
     left_foot_0 = biped.robot.framePosition(biped.formulation.data(), biped.LF).translation
     right_foot_0 = biped.robot.framePosition(biped.formulation.data(), biped.RF).translation
@@ -147,6 +156,9 @@ def run_walking_simulation():
     
     # Step MuJoCo again to update the model state
     mujoco.mj_step(mj_model, mj_data)
+    
+    # Re-update the pinocchio model data with the final initial position
+    biped.formulation.computeProblemData(0.0, mj_data.qpos, mj_data.qvel)
     
     # Now get the actual CoM position after proper positioning
     com_0 = biped.robot.com(biped.formulation.data())
@@ -248,10 +260,15 @@ def run_walking_simulation():
             while viewer.is_running():
                 t_elapsed = time.time() - start_time
                 try:
+                    # Update the controller first to generate fresh trajectories
                     controller.update()
-                    com_ref = controller.biped.trajCom.getSample(t).value()
-                    com_vel_ref = controller.biped.trajCom.getSample(t).derivative()
-                    com_acc_ref = controller.biped.trajCom.getSample(t).second_derivative()
+                    
+                    # Now get the references from the controller
+                    sample = controller.biped.trajCom.getSample(t)
+                    com_ref = sample.value()
+                    com_vel_ref = sample.derivative()
+                    com_acc_ref = sample.second_derivative()
+
                     biped.sample_com.value(com_ref)
                     biped.sample_com.derivative(com_vel_ref)
                     biped.sample_com.second_derivative(com_acc_ref)
@@ -310,7 +327,7 @@ def run_walking_simulation():
                     dv = biped.formulation.getAccelerations(sol)
                     
                     # Very conservative velocity limits
-                    max_vel = 0.5  # Very conservative maximum velocity
+                    max_vel = 5.0  # Increased maximum velocity
                     if np.linalg.norm(v) > max_vel:
                         v = v * max_vel / np.linalg.norm(v)
                     
@@ -329,8 +346,8 @@ def run_walking_simulation():
                     
                     # Calculate errors for logging
                     com_y_error = com_ref[1] - com_true[1] if len(com_ref) > 1 else 0.0
-                    com_y_vel = com_vel_ref[1] if len(com_vel_ref) > 1 else 0.0
-                    com_y_acc = com_acc_ref[1] if len(com_acc_ref) > 1 else 0.0
+                    com_y_vel = com_vel_ref[1] if len(com_vel_ref) > 1 and com_vel_ref is not None else 0.0
+                    com_y_acc = com_acc_ref[1] if len(com_acc_ref) > 1 and com_acc_ref is not None else 0.0
                     support_foot = controller.get_support_foot()
                     
                     # Log data

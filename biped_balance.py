@@ -5,11 +5,12 @@ import op3_conf as conf
 import mujoco
 
 import time
+import csv
 
 import numpy as np
 
 def map_tsid_to_mujoco(q_tsid):
-    ctrl = np.zeros(18)
+    ctrl = np.zeros(20)
     ctrl[0] = q_tsid[22] # right shoulder pitch
     ctrl[1] = q_tsid[23] # right shoulder roll
     ctrl[2] = q_tsid[24] # right elbow
@@ -32,8 +33,18 @@ def map_tsid_to_mujoco(q_tsid):
     ctrl[15] = q_tsid[11] # left hip yaw
     ctrl[16] = q_tsid[12] # left knee
     ctrl[17] = q_tsid[13] # left ankle pitch
+    ctrl[18] = 0.0
+    ctrl[19] = 0.0
 
     return ctrl
+
+# Function to apply an external force to the robot's CoM
+def apply_com_push(mj_model, mj_data, push_force):
+    """Apply a force to the center of mass of the robot."""
+    com_pos = mj_data.subtree_com[mj_model.body('torso').id]
+    force = np.array(push_force)
+    mj_data.xfrc_applied[mj_model.body('torso').id][:3] = force
+    mj_data.xfrc_applied[mj_model.body('torso').id][3:] = np.cross(com_pos, force)
 
 biped = Biped(conf)
 
@@ -41,6 +52,24 @@ biped = Biped(conf)
 mj_model = mujoco.MjModel.from_xml_path(conf.mujoco_model_path)
 mj_data = mujoco.MjData(mj_model)
 mj_model.opt.timestep = conf.dt
+
+# Correctly initialize the robot's position in MuJoCo
+q, v = biped.q, biped.v
+mj_data.qpos = q
+mj_data.qvel = v
+mujoco.mj_step(mj_model, mj_data)
+biped.formulation.computeProblemData(0.0, q, v)
+left_foot_0 = biped.robot.framePosition(biped.formulation.data(), biped.LF).translation
+right_foot_0 = biped.robot.framePosition(biped.formulation.data(), biped.RF).translation
+feet_center = (left_foot_0 + right_foot_0) / 2.0
+q[0] = feet_center[0]
+q[1] = feet_center[1]
+min_foot_height = min(left_foot_0[2], right_foot_0[2])
+q[2] = q[2] - min_foot_height
+mj_data.qpos = q
+mj_data.qvel = v
+mujoco.mj_step(mj_model, mj_data)
+biped.formulation.computeProblemData(0.0, mj_data.qpos, mj_data.qvel)
 
 push_robot_active, push_robot_com_vel, com_vel_entry = True, np.array([0.0, -0.1, 0.0]), None
 
@@ -89,6 +118,11 @@ for i in range(mj_model.njnt):
     print(f"Joint {i}: {joint_name}, type: {joint_type}, qpos_addr: {joint_qpos_addr}, actuator_idx: {joint_actuator_idx}")
 
 # Main simulation loop
+# For logging
+log_data = []
+active_foot_traj = None
+traj_start_time = 0
+
 with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
     while viewer.is_running():
         t_elapsed = time.time() - start_time
@@ -123,13 +157,23 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         com_vel = biped.robot.com_vel(biped.formulation.data())
         w = np.sqrt(9.81 / com_0[2])
         cp = biped.compute_capture_point(com, com_vel, w)
+        is_falling = biped.falling()
 
-        if biped.falling():
-            start = i
-            footstep = biped.gen_footstep(cp, True, conf.step_time/conf.dt, conf.step_height)
+        if is_falling and active_foot_traj is None:
+            print(f"FALLING DETECTED at t={t:.2f}s! Generating recovery step.")
+            active_foot_traj = biped.gen_footstep(cp, True, int(conf.step_time/conf.dt), conf.step_height)
+            traj_start_time = i
             biped.removeRightFootContact()
 
-            biped.trajRF.setReference(footstep[start - i])
+        if active_foot_traj is not None:
+            traj_idx = i - traj_start_time
+            if traj_idx < len(active_foot_traj):
+                biped.trajRF.setReference(active_foot_traj[traj_idx])
+                biped.rightFootTask.setReference(biped.trajRF.computeNext())
+            else:
+                print(f"Recovery step finished at t={t:.2f}s. Re-enabling contact.")
+                biped.addRightFootContact()
+                active_foot_traj = None
 
         # Add reference geom to follow com ref
         mujoco.mjv_initGeom(
@@ -185,20 +229,36 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         mj_data.ctrl = map_tsid_to_mujoco(q)
         mujoco.mj_step(mj_model, mj_data)
 
-        if t_elapsed > 5.0:
-            print("Pushing robot")
+        # Apply a push to the robot after 3 seconds
+        push_active = t > 3.0 and t < 3.1
+        if t > 3.0 and push_robot_active:
+            print("Applying a push to the robot!")
+            apply_com_push(mj_model, mj_data, [0, 200, 0]) # Push forward with 200N force
             push_robot_active = False
-            data = biped.formulation.data()
-            J_LF = biped.contactLF.computeMotionTask(0.0, q, v, data).matrix
-            J_RF = biped.contactRF.computeMotionTask(0.0, q, v, data).matrix
-            J = np.vstack((J_LF, J_RF))
-            J_com = biped.comTask.compute(t, q, v, data).matrix
-            A = np.vstack((J_com, J))
-            b = np.concatenate((np.array(push_robot_com_vel), np.zeros(J.shape[0])))
-            v = np.linalg.lstsq(A, b, rcond=-1)[0]
-            starttime = time.time()
+
+        # Reset the push force after a short duration
+        if t > 3.1:
+            apply_com_push(mj_model, mj_data, [0, 0, 0])
+
+        # Log data for analysis
+        log_data.append([
+            t,
+            biped.trajCom.getSample(t).value()[0], biped.trajCom.getSample(t).value()[1], biped.trajCom.getSample(t).value()[2],
+            com[0], com[1], com[2],
+            cp[0], cp[1],
+            biped.robot.framePosition(biped.formulation.data(), biped.LF).translation[0], biped.robot.framePosition(biped.formulation.data(), biped.LF).translation[1],
+            biped.robot.framePosition(biped.formulation.data(), biped.RF).translation[0], biped.robot.framePosition(biped.formulation.data(), biped.RF).translation[1],
+            push_active,
+            is_falling
+        ])
 
         viewer.sync()
+
+    # Save the log file
+    with open('balance_log.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['time', 'com_ref_x', 'com_ref_y', 'com_ref_z', 'com_x', 'com_y', 'com_z', 'cp_x', 'cp_y', 'lfoot_x', 'lfoot_y', 'rfoot_x', 'rfoot_y', 'push_active', 'is_falling'])
+        writer.writerows(log_data)
 
     while viewer.is_running():
         viewer.sync()

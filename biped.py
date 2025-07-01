@@ -156,7 +156,7 @@ class Biped:
         self.leftFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.leftFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
         self.trajLF = tsid.TrajectorySE3Constant("traj-left-foot", H_lf_ref)
-        formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
+        # formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
 
         self.rightFootTask = tsid.TaskSE3Equality(
             "task-right-foot", self.robot, self.conf.rf_frame_name
@@ -164,7 +164,7 @@ class Biped:
         self.rightFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.rightFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
         self.trajRF = tsid.TrajectorySE3Constant("traj-right-foot", H_rf_ref)
-        formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
+        # formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
 
         self.tau_max = conf.tau_max_scaling * robot.model().effortLimit[-robot.na :]
         self.tau_min = -self.tau_max
@@ -223,6 +223,7 @@ class Biped:
             H_lf_ref = self.robot.framePosition(self.formulation.data(), self.LF)
             self.trajLF.setReference(H_lf_ref)
             self.leftFootTask.setReference(self.trajLF.computeNext())
+            self.formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
             self.formulation.removeRigidContact(self.contactLF.name, 0.0)
             self.contact_LF_active = False
 
@@ -231,11 +232,13 @@ class Biped:
             H_rf_ref = self.robot.framePosition(self.formulation.data(), self.RF)
             self.trajRF.setReference(H_rf_ref)
             self.rightFootTask.setReference(self.trajRF.computeNext())
+            self.formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
             self.formulation.removeRigidContact(self.contactRF.name, 0.0)
             self.contact_RF_active = False
 
     def addLeftFootContact(self):
         if not self.contact_LF_active:
+            self.formulation.removeTask(self.leftFootTask.name, 0.0)
             H_lf_ref = self.robot.framePosition(self.formulation.data(), self.LF)
             self.contactLF.setReference(H_lf_ref)
             if self.conf.w_contact >= 0.0:
@@ -250,6 +253,7 @@ class Biped:
 
     def addRightFootContact(self):
         if not self.contact_RF_active:
+            self.formulation.removeTask(self.rightFootTask.name, 0.0)
             H_rf_ref = self.robot.framePosition(self.formulation.data(), self.RF)
             self.contactRF.setReference(H_rf_ref)
             if self.conf.w_contact >= 0.0:
@@ -262,20 +266,53 @@ class Biped:
                 )
             self.contact_RF_active = True
 
-    def gen_footstep(self, pos, r_foot, steps, height):
-        pos0 = self.robot.framePosition(self.formulation.data(), self.RF if r_foot else self.LF).translation
-        x = np.linspace(pos0[0], pos[0], steps)
-        y = np.linspace(pos0[1], pos[1], steps)
-        z = [4 * height * (i / steps) * (1 - i / steps) for i in range(steps)]
-        traj = np.zeros((steps, 3))
-        traj[:, 0] = x
-        traj[:, 1] = y
-        traj[:, 2] = z
+    def gen_footstep(self, cp, move_right, n_time, height):
+        if move_right:
+            foot_frame = self.RF
+            stance_frame = self.LF
+        else:
+            foot_frame = self.LF
+            stance_frame = self.RF
 
-    def compute_capture_point(self, com, dcom, w):
-        cp = com + dcom / w
-        cp[2] = 0
-        return cp
+        swing_foot_pos = self.robot.framePosition(self.formulation.data(), foot_frame)
+        stance_foot_pos = self.robot.framePosition(self.formulation.data(), stance_frame)
+        
+        # Heuristic for max step length
+        max_step_x = 0.2
+        max_step_y = 0.2
+        
+        # Target foot position is based on the capture point
+        target_pos = stance_foot_pos.copy()
+        target_pos.translation[0] = cp[0]
+        target_pos.translation[1] = cp[1]
+
+        # Clamp the step to a reachable distance
+        delta_pos = target_pos.translation - stance_foot_pos.translation
+        delta_pos[0] = np.clip(delta_pos[0], -max_step_x, max_step_x)
+        delta_pos[1] = np.clip(delta_pos[1], -max_step_y, max_step_y)
+
+        final_foot_pos = stance_foot_pos.copy()
+        final_foot_pos.translation = stance_foot_pos.translation + delta_pos
+
+        footstep_tr = []
+        for i in range(n_time):
+            t = float(i) / (n_time-1)
+            # Cubic Hermite spline interpolation
+            s = -2 * t**3 + 3 * t**2
+            
+            # Sinusoidal trajectory for the foot height
+            z = height * np.sin(s * np.pi)
+
+            p = swing_foot_pos.translation * (1 - s) + final_foot_pos.translation * s
+            p[2] = swing_foot_pos.translation[2] * (1-s) + final_foot_pos.translation[2] * s + z
+            
+            sample = pin.SE3(swing_foot_pos.rotation, p)
+            footstep_tr.append(sample)
+        
+        return footstep_tr
+
+    def compute_capture_point(self, com, com_vel, w):
+        return com + com_vel / w
     
     def compute_support_polygon(self):
         data = self.formulation.data()
@@ -283,6 +320,29 @@ class Biped:
         lf_pos = self.robot.framePosition(data, self.LF).translation
         support_polygon = np.array([lf_pos[:2], rf_pos[:2]])
         return support_polygon
+
+    def falling(self):
+        """Check if the robot is falling."""
+        # A simple heuristic for falling: check if CoM is outside the support polygon
+        data = self.formulation.data()
+        com = self.robot.com(data)
+        support_polygon = self.compute_support_polygon()
+        
+        # Check if CoM projection is outside the line segment defined by the feet
+        # This is a simplification for bipedal support
+        foot1, foot2 = support_polygon[0], support_polygon[1]
+        com_proj = com[:2]
+        
+        # Vector from foot1 to foot2
+        f1_f2 = foot2 - foot1
+        # Vector from foot1 to CoM
+        f1_com = com_proj - foot1
+        
+        # Project f1_com onto f1_f2
+        proj_length = np.dot(f1_com, f1_f2) / np.dot(f1_f2, f1_f2)
+        
+        # If projection length is between 0 and 1, CoM is between the feet
+        return not (0 <= proj_length <= 1)
 
     def integrate_dv(self, q, v, dv, dt):
         v_mean = v + 0.5 * dt * dv
