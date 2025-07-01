@@ -136,10 +136,23 @@ class Biped:
         sampleAM = tsid.TrajectorySample(3)
         amTask.setReference(sampleAM)
 
+        # LIPM: Use 2D CoM task for horizontal movement
         comTask = tsid.TaskComEquality("task-com", robot)
-        comTask.setKp(conf.kp_com * np.ones(3))
-        comTask.setKd(2.0 * np.sqrt(conf.kp_com) * np.ones(3))
+        # Set gains: high for X,Y (horizontal), zero for Z (height constraint)
+        kp_com_xy = conf.kp_com * np.array([1.0, 1.0, 0.0])  # No Z control
+        kd_com_xy = 2.0 * np.sqrt(conf.kp_com) * np.array([1.0, 1.0, 0.0])  # No Z control
+        comTask.setKp(kp_com_xy)
+        comTask.setKd(kd_com_xy)
         formulation.addMotionTask(comTask, conf.w_com, 1, 0.0)
+        
+        # FIX HEIGHT: Separate CoM height constraint task
+        self.comHeightTask = tsid.TaskComEquality("task-com-height", robot)
+        # Set gains: zero for X,Y, high for Z (height only)
+        kp_com_z = conf.kp_com_height * np.array([0.0, 0.0, 1.0])  # Only Z control
+        kd_com_z = 2.0 * np.sqrt(conf.kp_com_height) * np.array([0.0, 0.0, 1.0])  # Only Z control
+        self.comHeightTask.setKp(kp_com_z)
+        self.comHeightTask.setKd(kd_com_z)
+        formulation.addMotionTask(self.comHeightTask, conf.w_com_height, 1, 0.0)
 
         postureTask = tsid.TaskJointPosture("task-posture", robot)
         print(f"DEBUG: gain_vector size: {len(conf.gain_vector)}")
@@ -156,7 +169,7 @@ class Biped:
         self.leftFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.leftFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
         self.trajLF = tsid.TrajectorySE3Constant("traj-left-foot", H_lf_ref)
-        # formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
+        formulation.addMotionTask(self.leftFootTask, self.conf.w_foot, 1, 0.0)
 
         self.rightFootTask = tsid.TaskSE3Equality(
             "task-right-foot", self.robot, self.conf.rf_frame_name
@@ -164,7 +177,7 @@ class Biped:
         self.rightFootTask.setKp(self.conf.kp_foot * np.ones(6))
         self.rightFootTask.setKd(2.0 * np.sqrt(self.conf.kp_foot) * np.ones(6))
         self.trajRF = tsid.TrajectorySE3Constant("traj-right-foot", H_rf_ref)
-        # formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
+        formulation.addMotionTask(self.rightFootTask, self.conf.w_foot, 1, 0.0)
 
         self.tau_max = conf.tau_max_scaling * robot.model().effortLimit[-robot.na :]
         self.tau_min = -self.tau_max
@@ -179,6 +192,7 @@ class Biped:
         self.v_max = conf.v_max_scaling * robot.model().velocityLimit[-robot.na :]
         self.v_min = -self.v_max
         jointBoundsTask.setVelocityBounds(self.v_min, self.v_max)
+        
         if conf.w_joint_bounds > 0.0:
             formulation.addMotionTask(jointBoundsTask, conf.w_joint_bounds, 0, 0.0)
 
