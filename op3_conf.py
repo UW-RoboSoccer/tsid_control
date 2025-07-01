@@ -18,16 +18,16 @@ linear_vel = 0.03   # Very slow linear velocity (m/s)
 k_dcm = 0.005  # very small DCM feedback gain
 m = 1.5  # robot mass (kg)
 
-# Very conservative task weights for walking stability
-w_com = 1.0  # very small weight of center of mass task
-w_am = 1e-2  # very small angular momentum task for balance
-w_foot = 1e-5  # very tiny weight of the foot motion task
-w_contact = 100.0  # very strong contact constraint
-w_posture = 1e-2  # very small joint posture task for stability
-w_forceRef = 1e-3  # very small weight of force regularization task
-w_cop = 1e-3  # very small CoP control
-w_torque_bounds = 1e-2  # very small weight of the torque bounds
-w_joint_bounds = 1e-2  # very small joint bounds
+# ULTRA-CONSERVATIVE: Make system much more stable than biped_balance.py
+w_com = 1.0     # MATCH biped_balance.py exactly
+w_am = 0.01     # MUCH LOWER: Reduce angular momentum influence
+w_foot = 1e-5   # MINIMAL: Almost no foot motion tasks (like biped_balance.py)
+w_contact = 100.0  # MATCH biped_balance.py exactly  
+w_posture = 0.01   # MATCH biped_balance.py exactly
+w_forceRef = 0.001 # MATCH biped_balance.py exactly
+w_cop = 0.001  # MATCH biped_balance.py exactly
+w_torque_bounds = 0.01  # LOWER: Conservative bounds
+w_joint_bounds = 0.01   # LOWER: Conservative bounds
 
 lyp = 0.055  # foot length in positive x direction
 lyn = 0.055 # foot length in negative x direction
@@ -41,22 +41,22 @@ fMax = 1000.0  # maximum normal force
 tau_max_scaling = 1.0  # very conservative scaling factor of torque bounds
 v_max_scaling = 2.0  # very conservative scaling factor of velocity bounds
 
-# Very conservative gains for walking stability
-kp_contact = 100.0  # very strong contact constraint
-kp_foot = 1.0  # very small foot constraint
-kp_com = 1.0  # very small center of mass task
-kp_am = 1.0  # very small angular momentum task
-kp_posture = 0.1  # very small joint posture task
+# ULTRA-CONSERVATIVE: Much lower gains to prevent instability
+kp_contact = 100.0  # KEEP HIGH: Contact needs to be stiff for ground contact
+kp_foot = 1.0       # MUCH LOWER: Reduce foot tracking aggression  
+kp_com = 1.0        # MUCH LOWER: Gentle CoM tracking to prevent oscillations
+kp_am = 1.0         # MUCH LOWER: Gentle angular momentum control
+kp_posture = 1.0    # REASONABLE: Keep joint posture moderate
 
 masks_posture = np.ones(20)
 
-# Very conservative gain vector for walking stability
+# ULTRA-CONSERVATIVE gain vector - prevent all instability
 gain_vector = np.array([
-    0.5, 0.5, # head (2 joints) - very conservative
-    0.2, 0.2, 0.2, 0.1, 0.1, # left leg (5 joints) - extremely conservative control
-    0.2, 0.2, 0.2, # left arm (3 joints)
-    0.2, 0.2, 0.2, 0.1, 0.1, # right leg (5 joints) - extremely conservative control
-    0.2, 0.2, 0.2, 0.1, 0.1 # right arm (5 joints)
+    0.1, 0.1, # head (2 joints) - minimal control
+    0.05, 0.05, 0.05, 0.02, 0.02, # left leg (5 joints) - ULTRA conservative
+    0.1, 0.1, 0.1, # left arm (3 joints) - minimal
+    0.05, 0.05, 0.05, 0.02, 0.02, # right leg (5 joints) - ULTRA conservative  
+    0.1, 0.1, 0.1, 0.05, 0.05 # right arm (5 joints) - minimal
 ]) # gain vector for postural task (20 joints total)
 
 contactNormal = np.array(

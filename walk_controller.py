@@ -46,10 +46,11 @@ class Controller:
         self.depth = 3  # Number of future steps to consider for trajectory generation
         
         # Natural frequency of the linearized inverted pendulum
-        self.w_n = np.sqrt(conf.g / conf.z0)  # Fixed: was conf.z0 / conf.g
+        # FIXED: Will be updated with actual robot height after initialization
+        self.w_n = np.sqrt(conf.g / conf.z0)  # Temporary, will be updated
         
         # Initialize state variables
-        self.x = np.zeros(3)     # [x, y, z] CoM position
+        self.x = np.array([0.0, 0.0, conf.z0])  # DCM state [x, y, z]
         self.dx = np.zeros(3)    # [dx, dy, dz] CoM velocity
         self.ddx = np.zeros(3)   # [ddx, ddy, ddz] CoM acceleration
         self.e = np.zeros(3)     # [x, y, z] DCM position
@@ -113,8 +114,8 @@ class Controller:
         right_foot_moving = True  # Start by moving right foot
         
         for i in range(num_steps):
-            # Calculate the target position for the next footstep with very conservative steps
-            target_x = current_x + (i + 1) * (self.conf.step_length * 0.5)  # Use only half the configured step length
+            # Calculate the target position for the next footstep with ultra-conservative steps
+            target_x = current_x + (i + 1) * (self.conf.step_length * 0.1)  # FIXED: Use only 10% of configured step length
             
             if right_foot_moving:
                 # Right foot moves forward
@@ -160,12 +161,12 @@ class Controller:
             x_traj = np.linspace(start_pos[0], end_pos[0], num_points)
             y_traj = np.linspace(start_pos[1], end_pos[1], num_points)
             
-            # Simple parabolic height profile with lower maximum height
+            # Simple parabolic height profile with ultra-low maximum height
             z_traj = np.zeros(num_points)
             for j in range(num_points):
                 # Parabolic height profile: max height at middle of step
                 t_norm = j / (num_points - 1)
-                z_traj[j] = 4 * self.conf.step_height * t_norm * (1 - t_norm)
+                z_traj[j] = 4 * (self.conf.step_height * 0.2) * t_norm * (1 - t_norm)  # FIXED: Use 20% of step height
             
             # Create homogeneous transformation matrices for each point
             HTM = []
@@ -268,23 +269,23 @@ class Controller:
         # DCM feedback control law with VERY conservative gains
         dcm_error = dcm_ref - self.e[:2]  # Only use x,y components
         
-        # VERY conservative gains for DCM control
-        k_dcm = 0.5  # Reduced from 5.0 to 0.5 for stability
+        # EXTREMELY conservative gains for DCM control
+        k_dcm = 0.1  # FIXED: Reduced from 0.5 to 0.1 for ultra-stability
         
         # Calculate desired DCM velocity to track reference
         dcm_vel_des = k_dcm * dcm_error
         
         # Limit DCM velocity to prevent large movements
-        max_dcm_vel = 0.05  # Very conservative limit (5cm/s)
+        max_dcm_vel = 0.01  # FIXED: Reduced from 0.05 to 0.01 (1cm/s)
         dcm_vel_des = np.clip(dcm_vel_des, -max_dcm_vel, max_dcm_vel)
         
         # Very simple and conservative CoM reference calculation
         # Just move the CoM slightly towards the DCM reference
         com_ref = np.zeros(3)
         
-        # Very small movements in x,y to track DCM
-        com_ref[:2] = self.x[:2] + 0.1 * dcm_error  # Move 10% towards target
-        com_ref[2] = self.conf.z0  # Keep height constant
+        # Ultra-small movements in x,y to track DCM
+        com_ref[:2] = self.x[:2] + 0.02 * dcm_error  # FIXED: Move only 2% towards target (was 10%)
+        com_ref[2] = self.x[2]  # FIXED: Use current natural height, don't force config height!
         
         # Apply extremely conservative limits to prevent large movements
         max_com_change = 0.002  # Maximum CoM movement per step (2mm)
@@ -555,7 +556,7 @@ class Controller:
         self.logged_com_traj = []
 
         # Reset state variables
-        self.x = np.zeros(3)
+        self.x = np.array([0.0, 0.0, self.conf.z0])  # DCM state [x, y, z]
         self.dx = np.zeros(3)
         self.ddx = np.zeros(3)
         self.e = np.zeros(3)
@@ -620,6 +621,14 @@ class Controller:
     def start_walking(self):
         """Initialize the walking controller and start the first step."""
         print("Starting walking controller...")
+        
+        # FIXED: Update natural frequency with actual robot height
+        data = self.biped.formulation.data()
+        actual_com_height = self.biped.robot.com(data)[2]
+        old_w_n = self.w_n
+        self.w_n = np.sqrt(9.81 / actual_com_height)
+        if abs(old_w_n - self.w_n) > 0.01:  # Only print if significant change
+            print(f"Updated natural frequency: {old_w_n:.3f} → {self.w_n:.3f} (using actual height {actual_com_height:.3f}m)")
         
         # Generate trajectories if not already done
         if not self.footstep_traj:
