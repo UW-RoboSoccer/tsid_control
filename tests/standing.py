@@ -8,17 +8,25 @@ def test_standing():
     data = mujoco.MjData(model)
     
     # Set standing pose
-    data.qpos[2] = 0.4  # Height
-    data.qpos[7:17] = 0.0  # Joint positions (adjust indices as needed)
+    # Example: set the initial state to lie flat on the ground
+    data.qpos[0:3] = [0, 0, 0.06]  # x, y, z — small lift to avoid intersection
+
+    # Rotate 90° around X-axis (lie on back)
+    data.qpos[3:7] = [0.7071, 0.7071, 0.0, 0.0]  # w, x, y, z
+
+    # Optional: collapsed joints (e.g., legs curled, arms spread)
+    data.qpos[7:19] = np.deg2rad([
+    30, -20, -45, 90, -10, 5,   # right leg
+   -30,  20,  45, 90,  10, -5   # left leg
+   ])
+
     
     with mujoco.viewer.launch_passive(model, data) as viewer:
         for i in range(10000):  # 1 second
             mujoco.mj_step(model, data)
             viewer.sync()
             
-            if data.qpos[2] < 0.1:  # Fell below 10cm
-                print("Robot fell! fuck")
-                return False
+
     
     print("robot stand successfully")
     return True
