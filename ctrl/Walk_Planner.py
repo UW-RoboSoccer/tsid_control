@@ -1,6 +1,6 @@
 from typing import List
 
-from const import *
+from ctrl.conf import *
 
 from Foot_Trajectory import FootTrajectory
 from Footstep_Planner import Footstep

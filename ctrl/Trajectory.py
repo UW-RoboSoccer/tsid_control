@@ -1,4 +1,4 @@
-from const import dt
+from ctrl.conf import dt
 import math
 
 class Trajectory:
