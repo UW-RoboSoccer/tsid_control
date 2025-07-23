@@ -6,40 +6,31 @@ import mujoco
 import mujoco.viewer
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
-from ctrl.conf import RobotConfig
-
-conf = RobotConfig()
-
-# Initialize the MuJoCo model and data
-mj_model = mujoco.MjModel.from_xml_path(conf.mjcf)
-mj_data = mujoco.MjData(mj_model)
-mj_model.opt.timestep = conf.dt
+from testing.test_controller import test_controller
+from testing.robot_information import mj_model, mj_data, conf, get_body_world_positions
 
 start_time = time.time()
 
-# Print joint structure for both Pinocchio and MuJoCo
-print("Size of mujoco qpos: ", mj_data.ctrl.shape)
+num_cycles = 0
 
-print("\n=== MUJOCO JOINT STRUCTURE ===")
-print(f"nq: {mj_model.nq}, nu: {mj_model.nu}")
-print("Joint ordering in Mujoco:")
-for i in range(mj_model.njnt):
-    joint_name = mj_model.joint(i).name
-    joint_type = mj_model.joint(i).type
-    joint_qpos_addr = mj_model.joint(i).qposadr
-    joint_actuator_idx = -1
-    # Find corresponding actuator if any
-    for j in range(mj_model.nu):
-        if mj_model.actuator(j).trnid[0] == i:
-            joint_actuator_idx = j
-            break
-    print(
-        f"Joint {i}: {joint_name}, type: {joint_type}, qpos_addr: {joint_qpos_addr}, actuator_idx: {joint_actuator_idx}"
-    )
+test_controller.set_initial_pose(mj_model, mj_data)
+mujoco.mj_forward(mj_model, mj_data)
+print(f"qpos before forward: {mj_data.qpos}")
+test_controller.align_on_ground(mj_model, mj_data)
+mujoco.mj_forward(mj_model, mj_data)
+print(f"qpos after align: {mj_data.qpos}")
+get_body_world_positions(mj_model, mj_data)
+
 
 # Main simulation loop
 with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
     while viewer.is_running():
+        if num_cycles % 1000 == 0:
+            print(f"qpos: {mj_data.qpos}")
+            get_body_world_positions(mj_model, mj_data)
+
+        num_cycles += 1
+
         t_elapsed = time.time() - start_time
 
         viewer.opt.frame = mujoco.mjtFrame.mjFRAME_WORLD
