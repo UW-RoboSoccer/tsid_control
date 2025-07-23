@@ -16,17 +16,17 @@ class TestController:
         # Right leg
         mj_data.qpos[7] = 0.0  # right_hip_yaw
         mj_data.qpos[8] = 0.0  # right_hip_roll
-        mj_data.qpos[9] = 0.2  # right_hip_pitch
-        mj_data.qpos[10] = -0.4  # right_knee
-        mj_data.qpos[11] = 0.2  # right_ankle_pitch
+        mj_data.qpos[9] = 0.0  # right_hip_pitch
+        mj_data.qpos[10] = 0.0  # right_knee
+        mj_data.qpos[11] = 0.0  # right_ankle_pitch
         mj_data.qpos[12] = 0.0  # right_ankle_roll
 
         # Left leg
         mj_data.qpos[13] = 0.0  # left_hip_yaw
         mj_data.qpos[14] = 0.0  # left_hip_roll
-        mj_data.qpos[15] = 0.2  # left_hip_pitch
-        mj_data.qpos[16] = -0.4  # left_knee
-        mj_data.qpos[17] = 0.2  # left_ankle_pitch
+        mj_data.qpos[15] = 0.0  # left_hip_pitch
+        mj_data.qpos[16] = 0.0  # left_knee
+        mj_data.qpos[17] = 0.0  # left_ankle_pitch
         mj_data.qpos[18] = 0.0  # left_ankle_roll
 
     def align_on_ground(self, mj_model, mj_data):
