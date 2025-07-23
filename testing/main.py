@@ -8,7 +8,6 @@ import mujoco.viewer
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 from ctrl.conf import RobotConfig
 
-
 conf = RobotConfig()
 
 # Initialize the MuJoCo model and data
@@ -38,41 +37,19 @@ for i in range(mj_model.njnt):
         f"Joint {i}: {joint_name}, type: {joint_type}, qpos_addr: {joint_qpos_addr}, actuator_idx: {joint_actuator_idx}"
     )
 
-global running, paused
-running = True
-paused = False
-
-
-def key_cb(key):
-    global running, paused
-    if chr(key) == "q":
-        print("Exiting simulation...")
-        running = False
-
-    if chr(key) == "p":
-        print("Pausing simulation...")
-        paused = not paused
-
-
 # Main simulation loop
 with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
-    while running and viewer.is_running():
-        if not paused:
-            t_elapsed = time.time() - start_time
-
-            viewer.opt.frame = mujoco.mjtFrame.mjFRAME_WORLD
-
-            viewer.user_scn.ngeom = 4
-
-            mujoco.mj_step(mj_model, mj_data)
-
-            viewer.sync()
-
-        time.sleep(conf.dt / 2)
-
     while viewer.is_running():
-        if not paused:
-            viewer.sync()
+        t_elapsed = time.time() - start_time
+
+        viewer.opt.frame = mujoco.mjtFrame.mjFRAME_WORLD
+
+        viewer.user_scn.ngeom = 4
+
+        mujoco.mj_step(mj_model, mj_data)
+
+        viewer.sync()
+
         time.sleep(conf.dt / 2)
 
 print("Simulation finished!")
