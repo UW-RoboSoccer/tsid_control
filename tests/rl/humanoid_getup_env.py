@@ -1,3 +1,4 @@
+# fixed_humanoid_getup_env.py
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
@@ -5,9 +6,11 @@ import mujoco
 import mujoco.viewer
 
 class HumanoidGetupEnv(gym.Env):
-    def __init__(self, render_mode=False):
+    def __init__(self, render_mode=False, debug=False):
         super().__init__()
         self.render_mode = render_mode
+        self.debug = debug
+
         self.model = mujoco.MjModel.from_xml_path("../../robot/v1/mujoco/robot_damped.xml")
         self.data = mujoco.MjData(self.model)
         self.dt = self.model.opt.timestep
@@ -16,67 +19,103 @@ class HumanoidGetupEnv(gym.Env):
         if self.render_mode:
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
 
-        # Observation = joint positions, velocities, torso height/orientation
-        obs_dim = self.model.nq + self.model.nv
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
+        self.selected_indices = [9, 10, 11, 16, 17, 19, 20, 21]  # shoulder_pitch, elbow, hip_pitch, knee, ankle_pitch
 
-        # Action = joint torques (clip to actuator limits)
-        act_dim = self.model.nu
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(act_dim,), dtype=np.float32)
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf,
+            shape=(self.model.nq + self.model.nv,), dtype=np.float32
+        )
+        self.action_space = spaces.Box(
+            low=-1.0, high=1.0,
+            shape=(5,),  # 5 symmetric DOFs
+            dtype=np.float32
+        )
 
-        self.sim_steps_per_action = 10  # More stable training
+
+        self.sim_steps_per_action = 10
         self._step_counter = 0
         self._standing_counter = 0
-        self._standing_threshold = int(10 / self.dt)  # 10 seconds
-        self._max_steps = int(10 / self.dt)  # 10 seconds
+        self._standing_threshold = int(1.0 / self.dt)
+        self._max_steps = int(10.0 / self.dt)
+
+        self.previous_action = np.zeros(self.model.nu)
 
     def _get_obs(self):
         return np.concatenate([self.data.qpos, self.data.qvel])
 
     def _get_reward(self):
-        reward = 0.0
+        TORSO_BODY_ID = 1
+        HEAD_BODY_ID = 21
+        HEAD_TARGET_HEIGHT = 0.45
 
-        # --------------------------------------
-        # Get torso position, orientation, and velocity
-        # --------------------------------------
-        torso_height = self.data.qpos[2]                # z-pos of torso root
-        torso_quat = self.data.qpos[3:7]                # orientation quaternion
-        torso_upright_score = torso_quat[0]             # 'w' component ~1 when upright
-        torso_z_vel = self.data.qvel[2]                 # vertical velocity
+        RIGHT_FOOT_ID = 7
+        LEFT_FOOT_ID = 13
+        WORLD_ID = 0
 
-        # --------------------------------------------------
-        # Reward standing upright (if above minimum height)
-        # --------------------------------------------------
-        if torso_height > 0.6:                          # adjust threshold as needed
-            reward += 5.0 * torso_upright_score         # reward being upright
-            reward += 2.0                               # bonus for height itself
-        else:
-            reward -= 1.0                               # penalty if still on ground
+        h_head = self.data.xpos[HEAD_BODY_ID][2]
+        xmat = self.data.xmat[TORSO_BODY_ID].reshape(3, 3)
+        pitch = np.arcsin(-xmat[2, 0])
 
-        # Penalize vertical bouncing to reduce flailing
-        reward -= 1.0 * abs(torso_z_vel)
+        # Strong head height reward
+        R_up = 3.0 * np.clip(h_head / HEAD_TARGET_HEIGHT, 0.0, 1.0)
 
-        # --------------------------------------------------
-        # Contact-based reward/penalty (feet vs torso)
-        # --------------------------------------------------
-        ground_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "ground")
-        torso_id  = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "torso")
-        foot_ids = [
-            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot"),
-            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot2 ")
-        ]
+        # Pitch alignment reward (only when head is high enough)
+        R_pitch = 1.0 * float(h_head > 0.3) * np.exp(-10.0 * pitch ** 2)
 
-        for i in range(self.data.ncon):
-            contact = self.data.contact[i]
-            g1, g2 = contact.geom1, contact.geom2
+        # Control effort reward (only once upright-ish)
+        delta_a = self.data.ctrl - self.previous_action
+        R_var = 0.05 * np.exp(-np.linalg.norm(delta_a)) if h_head > 0.35 else 0.0
+        self.previous_action = self.data.ctrl.copy()
 
-            # Reward feet-ground contact
-            if ground_id in (g1, g2) and (g1 in foot_ids or g2 in foot_ids):
-                reward += 1.0
+        # Velocity reward (only if near standing)
+        R_vel = 0.05 * np.exp(-np.linalg.norm(self.data.qvel)) if h_head > 0.35 else 0.0
 
-            # Penalize torso-ground contact
-            if (g1 == torso_id and g2 == ground_id) or (g2 == torso_id and g1 == ground_id):
-                reward -= 3.0
+        # Contact info
+        self_collisions = 0
+        contact_right = 0
+        contact_left = 0
+
+        try:
+            for i in range(self.data.ncon):
+                c = self.data.contact[i]
+                b1 = self.model.geom_bodyid[c.geom1]
+                b2 = self.model.geom_bodyid[c.geom2]
+
+                if b1 == b2 and b1 != 0:
+                    self_collisions += 1
+
+                if WORLD_ID in [b1, b2]:
+                    if RIGHT_FOOT_ID in [b1, b2]:
+                        contact_right = 1
+                    if LEFT_FOOT_ID in [b1, b2]:
+                        contact_left = 1
+        except Exception as e:
+            if self.debug:
+                print(f"[REWARD DEBUG] Contact processing error: {e}")
+
+        R_coll = 0.1 * np.exp(-self_collisions)
+        R_foot_contact = 0.1 * (contact_right + contact_left)
+
+        # Bonus for staying upright
+        bonus = 0.0
+        if h_head > 0.43 and abs(pitch) < 0.3:
+            bonus += 3.0
+            if self._standing_counter % int(1.0 / self.dt) == 0:
+                bonus += 3.0
+
+        # Mild penalty for being too low
+        penalty = -0.5 if h_head < 0.15 else 0.0
+
+        reward = (
+            R_up + R_pitch + R_vel + R_var + R_coll +
+            R_foot_contact + bonus + penalty
+        )
+
+        if self.debug:
+            print(f"[REWARD DEBUG] Head Height: {h_head:.3f}, Pitch: {pitch:.3f}")
+            print(f"[REWARD DEBUG] R_up: {R_up:.3f}, R_pitch: {R_pitch:.3f}, R_vel: {R_vel:.3f}, "
+                f"R_var: {R_var:.3f}, R_coll: {R_coll:.3f}, R_foot_contact: {R_foot_contact:.3f}")
+            print(f"[REWARD DEBUG] Bonus: {bonus:.3f}, Penalty: {penalty:.3f}, Total: {reward:.3f}")
 
         return reward
 
@@ -84,77 +123,71 @@ class HumanoidGetupEnv(gym.Env):
 
 
 
-    def _is_standing(self):
-        torso_height = self.data.qpos[2]
-        torso_quat = self.data.qpos[3:7]
-        torso_up = torso_quat[0]  # w close to 1 when upright
-        low_vel = np.linalg.norm(self.data.qvel[:3]) < 0.5
-
-        return torso_height > 0.9 and torso_up > 0.9 and low_vel
 
     def _is_done(self):
-        # How long we've been running
         self._step_counter += 1
-        # Measure torso height and orientation
-        torso_height = self.data.qpos[2]
-        up_vector = self.data.xmat[1].reshape(3, 3)[:, 2]
-        uprightness = up_vector @ np.array([0, 0, 1])  # dot product with global Z
-        # Check if standing
-        is_upright = torso_height > 0.8 and uprightness > 0.9
-        if is_upright:
+        h_head = self.data.xpos[21][2]
+        uprightness = self.data.xmat[1].reshape(3, 3)[:, 2] @ np.array([0, 0, 1])
+        low_vel = np.linalg.norm(self.data.qvel[:3]) < 0.5
+
+        if h_head > 0.43 and uprightness > 0.9 and low_vel:
             self._standing_counter += 1
         else:
             self._standing_counter = 0
-        # End if success: standing for 10 seconds
+
         if self._standing_counter >= self._standing_threshold:
             return True
-        # End if episode is too long (fail timeout)
         if self._step_counter >= self._max_steps:
             return True
-        # Do NOT end if it's just fallen allow recovery!
+        if np.any(np.abs(self.data.qvel) > 25.0):
+            return True
         return False
-
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
-        # Reset simulation state
+
         mujoco.mj_resetData(self.model, self.data)
-        # Reset counters
+        self.data.time = 0.0
+
         self._step_counter = 0
         self._standing_counter = 0
-        # Position: torso slightly above ground
-        self.data.qpos[0:3] = [0, 0, 0.06]  # x, y, z
-        # Orientation: 90° rotation around X-axis (lying flat on back)
-        self.data.qpos[3:7] = [0.7071, 0.7071, 0.0, 0.0]  # w, x, y, z
-        # Joint positions: collapsed pose
-        self.data.qpos[7:19] = np.deg2rad([
-            30, -20, -45, 90, -10, 5,   # right leg
-        -30,  20,  45, 90,  10, -5   # left leg
-        ])
-        # Zero velocities
-        self.data.qvel[:] = 0
-        # Recompute derived quantities
+        self.previous_action = np.zeros(self.model.nu)
+
+        self.data.qpos[0:3] = np.random.uniform(-0.1, 0.1, size=3)
+        angle = np.random.uniform(-np.pi / 2, np.pi / 2)
+        quat = [np.cos(angle / 2), np.sin(angle / 2), 0, 0]
+        self.data.qpos[3:7] = quat
+        self.data.qpos[7:] = np.random.uniform(-1.0, 1.0, size=self.model.nq - 7)
+        self.data.qvel[:] = np.random.normal(0, 0.1, size=self.model.nv)
+
         mujoco.mj_forward(self.model, self.data)
-        # Get initial observation
-        obs = self._get_obs()
-        return obs, {}
-    
-        # super().reset(seed=seed)  # Ensures reproducibility
-        # mujoco.mj_resetData(self.model, self.data)
-        # self.data.qpos[:] = np.zeros_like(self.data.qpos)
-        # self.data.qvel[:] = np.zeros_like(self.data.qvel)
-        # self.data.qpos[2] = 0.3  # Low height
-        # obs = self._get_obs()
-        # info = {}
-        # return obs, info
+        if self.render_mode and self.viewer is not None:
+            self.viewer.sync()
+        print("[ENV RESET] Resetting environment with new random pose.")
+        return self._get_obs(), {}
 
     def step(self, action):
         action = np.clip(action, -1.0, 1.0)
+        
+        # (left_idx, right_idx, sign_flip_for_right)
+        symmetric_actuators = [
+            (8, 2, True),   # Hip pitch: no flip
+            (9, 3, True),   # Knee: no flip
+            (10, 4, True),   # Ankle pitch: flip
+            (12, 15, True), # Shoulder pitch: no flip
+            (14, 17, True), # Elbow: no flip
+        ]
+        
+        full_action = np.zeros(self.model.nu)
+        
+        for i, (left_idx, right_idx, flip_right) in enumerate(symmetric_actuators):
+            full_action[left_idx] = action[i]
+            full_action[right_idx] = -action[i] if flip_right else action[i]
+
+        # Convert to control signal
         ctrl_range = self.model.actuator_ctrlrange
-        ctrl_low = ctrl_range[:, 0]
-        ctrl_high = ctrl_range[:, 1]
-        scaled_action = ctrl_low + (action + 1.0) * 0.5 * (ctrl_high - ctrl_low)
-        self.data.ctrl[:] = scaled_action
+        scaled = ctrl_range[:, 0] + (full_action + 1.0) * 0.5 * (ctrl_range[:, 1] - ctrl_range[:, 0])
+        self.data.ctrl[:] = scaled
 
         for _ in range(self.sim_steps_per_action):
             mujoco.mj_step(self.model, self.data)
@@ -164,10 +197,15 @@ class HumanoidGetupEnv(gym.Env):
 
         obs = self._get_obs()
         reward = self._get_reward()
-        terminated = self._is_done()   # End due to task failure (falling)
-        truncated = False              # Can implement time limit later
-        info = {}
-        return obs, reward, terminated, truncated, info
+        done = self._is_done()
+        info = {
+            "is_success": bool(self._standing_counter >= self._standing_threshold)
+        }
+
+        return obs, reward, done, False, info
+
+
+
 
     def render(self, mode="human"):
         if self.viewer is None:

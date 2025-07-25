@@ -6,7 +6,7 @@ import time
 env = HumanoidGetupEnv(render_mode=True)
 
 # Load trained model (or comment this out to test random policy)
-model = PPO.load("models/humanoid_getup_policy")
+model = PPO.load("models/ppo_humanoid_2000000_steps")
 
 obs, _ = env.reset()
 
