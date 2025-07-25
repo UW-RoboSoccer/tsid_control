@@ -56,11 +56,11 @@ class HumanoidGetupEnv(gym.Env):
         xmat = self.data.xmat[TORSO_BODY_ID].reshape(3, 3)
         pitch = np.arcsin(-xmat[2, 0])
 
-        # Strong head height reward
-        R_up = 3.0 * np.clip(h_head / HEAD_TARGET_HEIGHT, 0.0, 1.0)
+        # StrongER head height reward
+        R_up = 20.0 * np.clip(h_head / HEAD_TARGET_HEIGHT, 0.0, 1.0)
 
-        # Pitch alignment reward (only when head is high enough)
-        R_pitch = 1.0 * float(h_head > 0.3) * np.exp(-10.0 * pitch ** 2)
+        # STRONGER Pitch alignment reward (only when head is high enough)
+        R_pitch = 10.0 * float(h_head > 0.3) * np.exp(-10.0 * pitch ** 2)
 
         # Control effort reward (only once upright-ish)
         delta_a = self.data.ctrl - self.previous_action
@@ -96,9 +96,10 @@ class HumanoidGetupEnv(gym.Env):
         R_coll = 0.1 * np.exp(-self_collisions)
         R_foot_contact = 0.1 * (contact_right + contact_left)
 
-        # Bonus for staying upright
+        # Bigger Bonus for staying upright
         bonus = 0.0
-        if h_head > 0.43 and abs(pitch) < 0.3:
+        # softened this abit for now
+        if h_head > 0.35 and abs(pitch) < 0.5:
             bonus += 3.0
             if self._standing_counter % int(1.0 / self.dt) == 0:
                 bonus += 3.0
@@ -110,6 +111,7 @@ class HumanoidGetupEnv(gym.Env):
             R_up + R_pitch + R_vel + R_var + R_coll +
             R_foot_contact + bonus + penalty
         )
+ 
 
         if self.debug:
             print(f"[REWARD DEBUG] Head Height: {h_head:.3f}, Pitch: {pitch:.3f}")
@@ -117,6 +119,10 @@ class HumanoidGetupEnv(gym.Env):
                 f"R_var: {R_var:.3f}, R_coll: {R_coll:.3f}, R_foot_contact: {R_foot_contact:.3f}")
             print(f"[REWARD DEBUG] Bonus: {bonus:.3f}, Penalty: {penalty:.3f}, Total: {reward:.3f}")
 
+
+        reward *= (1.0 - self._step_counter / self._max_steps) # can try adding a time discount
+        # protect against huge ass value_loss hopefully cause ppo is sensitive to reward scale jumps
+        reward = np.clip(reward, -10.0, 10.0)
         return reward
 
 
@@ -153,12 +159,40 @@ class HumanoidGetupEnv(gym.Env):
         self._standing_counter = 0
         self.previous_action = np.zeros(self.model.nu)
 
-        self.data.qpos[0:3] = np.random.uniform(-0.1, 0.1, size=3)
-        angle = np.random.uniform(-np.pi / 2, np.pi / 2)
-        quat = [np.cos(angle / 2), np.sin(angle / 2), 0, 0]
-        self.data.qpos[3:7] = quat
-        self.data.qpos[7:] = np.random.uniform(-1.0, 1.0, size=self.model.nq - 7)
-        self.data.qvel[:] = np.random.normal(0, 0.1, size=self.model.nv)
+        # self.data.qpos[0:3] = np.random.uniform(-0.1, 0.1, size=3)
+        # angle = np.random.uniform(-np.pi / 2, np.pi / 2)
+
+        # trying curriculum learning (can comment this out and use above)
+        # graudually increase randomness based on training progress
+        # i just generated with gpt so this shit prob ass, tune how frequence it happens
+        # goal is to reduce wasted episodes
+        reset_level = np.random.rand()
+        if reset_level < 0.2:  # 20% chance: nearly standing
+            self.data.qpos[2] = 0.4  # vertical z
+            self.data.qpos[3:7] = [1, 0, 0, 0]  # facing forward
+            self.data.qpos[7:] = 0
+            self.data.qvel[:] = 0
+        elif reset_level < 0.6:  # 40% chance: seated or low
+            self.data.qpos[2] = 0.2
+            angle = np.random.uniform(-0.5, 0.5)
+            quat = [np.cos(angle / 2), np.sin(angle / 2), 0, 0]
+            self.data.qpos[3:7] = quat
+            self.data.qpos[7:] = np.random.uniform(-0.3, 0.3, size=self.model.nq - 7)
+            self.data.qvel[:] = np.random.normal(0, 0.05, size=self.model.nv)
+        else:  # 40% chance: fully random
+            self.data.qpos[0:3] = np.random.uniform(-0.1, 0.1, size=3)
+            angle = np.random.uniform(-np.pi / 2, np.pi / 2)
+            quat = [np.cos(angle / 2), np.sin(angle / 2), 0, 0]
+            self.data.qpos[3:7] = quat
+            self.data.qpos[7:] = np.random.uniform(-1.0, 1.0, size=self.model.nq - 7)
+            self.data.qvel[:] = np.random.normal(0, 0.1, size=self.model.nv)
+
+
+
+        # quat = [np.cos(angle / 2), np.sin(angle / 2), 0, 0]
+        # self.data.qpos[3:7] = quat
+        # self.data.qpos[7:] = np.random.uniform(-1.0, 1.0, size=self.model.nq - 7)
+        # self.data.qvel[:] = np.random.normal(0, 0.1, size=self.model.nv)
 
         mujoco.mj_forward(self.model, self.data)
         if self.render_mode and self.viewer is not None:
@@ -199,7 +233,10 @@ class HumanoidGetupEnv(gym.Env):
         reward = self._get_reward()
         done = self._is_done()
         info = {
-            "is_success": bool(self._standing_counter >= self._standing_threshold)
+            "is_success": bool(self._standing_counter >= self._standing_threshold),
+            "standing_counter": self._standing_counter,
+            "head_height": self.data.xpos[21][2],
+            "pitch": np.arcsin(-self.data.xmat[1].reshape(3, 3)[:, 2] @ np.array([0, 0, 1]))
         }
 
         return obs, reward, done, False, info
