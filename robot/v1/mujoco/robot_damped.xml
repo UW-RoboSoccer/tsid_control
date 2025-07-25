@@ -3,7 +3,7 @@
   <default>
     <default class="C:\Users\David\desktop\v1_mujoco">
       <joint frictionloss="0.1" armature="0.005" range="-1.57 1.57" damping="0.5" />
-      <position kp="2" dampratio="1" />
+      <position kp="3" dampratio="1" />
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" group="2" />
       </default>
@@ -327,26 +327,26 @@
     <material name="camera_enclosure_collision_material" rgba="0.623322 0.771679 0.860693 1" />
   </asset>
   <actuator>
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_hip_yaw" joint="right_hip_yaw" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_hip_roll" joint="right_hip_roll" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_hip_pitch" joint="right_hip_pitch" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_knee" joint="right_knee" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_ankle_pitch" joint="right_ankle_pitch" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_ankle_roll" joint="right_ankle_roll" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_hip_yaw" joint="left_hip_yaw" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_hip_roll" joint="left_hip_roll" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_hip_pitch" joint="left_hip_pitch" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_knee" joint="left_knee" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_ankle_pitch" joint="left_ankle_pitch" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_ankle_roll" joint="left_ankle_roll" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_shoulder_pitch" joint="left_shoulder_pitch" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_shoulder_roll" joint="left_shoulder_roll" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="left_elbow" joint="left_elbow" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_shoulder_pitch" joint="right_shoulder_pitch" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_shoulder_roll" joint="right_shoulder_roll" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="right_elbow" joint="right_elbow" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="head_yaw" joint="head_yaw" kp="2" ctrlrange="-1.57 1.57" />
-    <position class="C:\Users\David\desktop\v1_mujoco" name="head_pitch" joint="head_pitch" kp="2" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_hip_yaw" joint="right_hip_yaw" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_hip_roll" joint="right_hip_roll" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_hip_pitch" joint="right_hip_pitch" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_knee" joint="right_knee" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_ankle_pitch" joint="right_ankle_pitch" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_ankle_roll" joint="right_ankle_roll" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_hip_yaw" joint="left_hip_yaw" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_hip_roll" joint="left_hip_roll" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_hip_pitch" joint="left_hip_pitch" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_knee" joint="left_knee" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_ankle_pitch" joint="left_ankle_pitch" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_ankle_roll" joint="left_ankle_roll" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_shoulder_pitch" joint="left_shoulder_pitch" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_shoulder_roll" joint="left_shoulder_roll" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="left_elbow" joint="left_elbow" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_shoulder_pitch" joint="right_shoulder_pitch" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_shoulder_roll" joint="right_shoulder_roll" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="right_elbow" joint="right_elbow" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="head_yaw" joint="head_yaw" kp="3" ctrlrange="-1.57 1.57" />
+    <position class="C:\Users\David\desktop\v1_mujoco" name="head_pitch" joint="head_pitch" kp="3" ctrlrange="-1.57 1.57" />
   </actuator>
   <equality />
 </mujoco>
