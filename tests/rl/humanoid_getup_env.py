@@ -37,92 +37,204 @@ class HumanoidGetupEnv(gym.Env):
         self._standing_counter = 0
         self._standing_threshold = int(1.0 / self.dt)
         self._max_steps = int(10.0 / self.dt)
+        self.best_height = 0.0        # for progress shaping
+        self.best_upright = 0.0
+        self.no_progress_steps = 0    # to detect stalls
+
 
         self.previous_action = np.zeros(self.model.nu)
 
     def _get_obs(self):
         return np.concatenate([self.data.qpos, self.data.qvel])
 
+    def _seg_upright(self, proximal_body_name: str, distal_body_name: str) -> float:
+        bp = self.model.body(proximal_body_name).id
+        bd = self.model.body(distal_body_name).id
+        v = self.data.xpos[bd] - self.data.xpos[bp]     # world vector along the segment
+        n = v / (np.linalg.norm(v) + 1e-9)
+        if float(self.data.xpos[self.model.body(proximal_body_name).id][2]) > float(self.data.xpos[self.model.body(distal_body_name).id][2]):
+            return float(n[2] * n[2])  # 0..1 (1 = perfectly vertical)
+        else:
+            return -float(n[2] * n[2])  # 0..1 (1 = perfectly vertical)
+    
+    def foot_flatness(self, body_name):
+        R = self.data.xmat[self.model.body(body_name).id].reshape(3,3)
+        ez = R[:,2]                        # body +Z (choose the axis that points out of the sole)
+        return abs(ez @ np.array([0,1,0])) # 1 when normal aligned with world-Z
+
+    def com_over_feet_score(self) -> float:
+        LEFT_FOOT_ID, RIGHT_FOOT_ID = 13, 7
+        com = np.array(self.data.subtree_com[1][:2])
+
+        lf = self.data.xpos[LEFT_FOOT_ID][:2]
+        rf = self.data.xpos[RIGHT_FOOT_ID][:2]
+
+        # Project COM to the line segment between feet
+        v  = rf - lf
+        vv = np.dot(v, v) + 1e-9
+        t  = np.clip(np.dot(com - lf, v) / vv, 0.0, 1.0)
+        p  = lf + t * v                       # closest point on segment
+        dist_lat = np.linalg.norm(com - p)    # sideways distance to segment
+
+        mid = 0.5 * (lf + rf)
+        width = np.sqrt(vv)
+        # also keep COM near the midpoint along the segment
+        off_along = abs(np.dot(com - mid, v) / (width + 1e-9))
+
+        sigma_lat   = 0.15 * width + 0.03
+        sigma_along = 0.20 * width + 0.04
+        return float(np.exp(-(dist_lat / sigma_lat)**2) * np.exp(-(off_along / sigma_along)**2))
+
+    def head_vertical_over_feet(self) -> float:
+        LF, RF, HEAD = 13, 7, 21
+        mid = 0.5 * (self.data.xpos[LF] + self.data.xpos[RF])   # midpoint of feet (world)
+        v   = self.data.xpos[HEAD] - mid                        # feet->head (world)
+        n   = v / (np.linalg.norm(v) + 1e-9)
+        return float(max(0.0, n[2])**2)  # only reward “up”, not down
+
+
+    # def _get_reward(self):
+    #     # ids
+    #     TORSO_BODY_ID = 1
+    #     HEAD_BODY_ID = 21
+    #     RIGHT_FOOT_ID = 7
+    #     LEFT_FOOT_ID = 13
+    #     RIGHT_HAND_BODY = 16
+    #     LEFT_HAND_BODY  = 19
+    #     WORLD_ID = 0
+    #     BUTT_ID = 18
+
+    #     # constants
+    #     EARLY_USE_HANDS_UNTIL = 0.32
+
+    #     h_head = float(self.data.xpos[HEAD_BODY_ID][2])
+    #     h_foot = float(self.data.xpos[LEFT_FOOT_ID][2])
+    #     xmat = self.data.xmat[TORSO_BODY_ID].reshape(3, 3)
+    #     uprightness = float(xmat[:, 2] @ np.array([0.0, 0.0, 1.0]))  # 0..1
+
+    #     R_foot = 0.0
+    #     R_head_vertical = 0.0
+        
+    #     # tracking contact with floor
+    #     feet_contact = 0
+    #     hand_contact = 0
+    #     unsafe_contacts = 0
+    #     for i in range(self.data.ncon):
+    #         c = self.data.contact[i]
+    #         b1 = self.model.geom_bodyid[c.geom1]
+    #         b2 = self.model.geom_bodyid[c.geom2]
+    #         # print("b1: " + str(b1))
+    #         # print("b2: " + str(b2))
+    #         if WORLD_ID in (b1, b2):
+    #             if RIGHT_FOOT_ID in (b1, b2) or LEFT_FOOT_ID in (b1, b2):
+    #                 feet_contact = 1
+    #                 if h_foot < 0.03:
+    #                     R_foot = 20.0 * self.foot_flatness("foot")
+    #                     R_head_vertical = 20.0 * self.head_vertical_over_feet()
+    #                 R_foot += 20.0 * self.com_over_feet_score()
+    #             if RIGHT_HAND_BODY in (b1, b2) or LEFT_HAND_BODY in (b1, b2):
+    #                 hand_contact = 1
+    #             # mild penalty for any other world contact (torso, head, upper arm, etc.)
+    #             if (b1 not in (RIGHT_FOOT_ID, LEFT_FOOT_ID, RIGHT_HAND_BODY, LEFT_HAND_BODY, WORLD_ID) or
+    #                 b2 not in (RIGHT_FOOT_ID, LEFT_FOOT_ID, RIGHT_HAND_BODY, LEFT_HAND_BODY, WORLD_ID)):
+    #                 unsafe_contacts += 1
+    #                 if(b2 == HEAD_BODY_ID or b2 == TORSO_BODY_ID):
+    #                     unsafe_contacts += 2
+    #     # print(self.head_vertical_over_feet())
+    #     # tracking leg uprightness
+    #     thigh_R = self._seg_upright("knee_housing", "knee_ankle_rotor_case")
+    #     shank_R = self._seg_upright("knee_ankle_rotor_case", "sts3250")
+    #     thigh_L = self._seg_upright("sts3250_2", "knee_ankle_rotor_case_2")
+    #     shank_L = self._seg_upright("knee_ankle_rotor_case_2", "sts3250_3")
+
+    #     # reward for legs being straight and up
+    #     R_leg = 10.0 * (thigh_R + shank_R + thigh_L + shank_L) 
+
+    #     # reward for higher head height
+    #     if h_head < h_foot:
+    #         R_height = -500
+    #     else:
+    #         R_height = 100.0 * h_head
+
+    #     # butt height
+    #     # R_butt = 300.0 * float(self.data.xpos[self.model.body("sts3250_4").id][2]) + 300.0 * float(self.data.xpos[self.model.body("sts3250_2").id][2])
+    #     # R_butt = 0.0
+
+    #     R_upright = 0.0
+    #     if h_head > 0.2:
+    #         R_upright = 100.0 * uprightness
+
+    #     # reward for feet touching and hands touching, punish for hands on floor after head height is above threshold (push off floor)
+    #     R_contacts = 0.0
+    #     if h_head < EARLY_USE_HANDS_UNTIL:
+    #         R_contacts += 10.0 * hand_contact
+    #         R_contacts += 20.0 * feet_contact
+    #     else:
+    #         R_contacts += 50.0 * feet_contact
+    #         R_contacts += -20.0 * hand_contact
+
+    #     # punishes any contact on the floor except hands and feet
+    #     R_unsafe = -30.0 * unsafe_contacts
+
+    #     # print(self.com_over_feet_score())
+    #     # print(leg_upright)
+    #     # print(self.foot_flatness("foot"))
+    #     # print("sts3250: " + str(float(self.data.xpos[self.model.body("sts3250").id][2])))
+    #     # print("sts3250_2: " + str(float(self.data.xpos[self.model.body("sts3250_2").id][2])))
+    #     # print("sts3250_3: " + str(float(self.data.xpos[self.model.body("sts3250_3").id][2])))
+    #     # print("sts3250_4: " + str(float(self.data.xpos[self.model.body("sts3250_4").id][2])))
+    #     # print("sts3250_5: " + str(float(self.data.xpos[self.model.body("sts3250_5").id][2])))
+    #     # print("sts3250_6: " + str(float(self.data.xpos[self.model.body("sts3250_6").id][2])))
+    #     # print("sts3250_4: " + str(self.model.body("sts3250_4").id))
+
+    #     reward = R_height + R_upright + R_contacts + R_unsafe + R_leg + R_foot + R_head_vertical
+
+    #     return reward
+
     def _get_reward(self):
+        # ids
         TORSO_BODY_ID = 1
         HEAD_BODY_ID = 21
-        HEAD_TARGET_HEIGHT = 0.45
-
         RIGHT_FOOT_ID = 7
         LEFT_FOOT_ID = 13
+        RIGHT_HAND_BODY = 16
+        LEFT_HAND_BODY  = 19
         WORLD_ID = 0
+        BUTT_ID = 18
 
-        h_head = self.data.xpos[HEAD_BODY_ID][2]
+        # constants
+        EARLY_USE_HANDS_UNTIL = 0.32
+        HEIGHT = 0.45
+
+        h_head = float(self.data.xpos[HEAD_BODY_ID][2])
+        h_foot = float(self.data.xpos[LEFT_FOOT_ID][2])
         xmat = self.data.xmat[TORSO_BODY_ID].reshape(3, 3)
-        pitch = np.arcsin(-xmat[2, 0])
+        uprightness = float(xmat[:, 2] @ np.array([0.0, 0.0, 1.0]))  # 0..1
 
-        # Strong head height reward
-        R_up = 3.0 * np.clip(h_head / HEAD_TARGET_HEIGHT, 0.0, 1.0)
+        thigh_R = self._seg_upright("knee_housing", "knee_ankle_rotor_case")
+        shank_R = self._seg_upright("knee_ankle_rotor_case", "sts3250")
+        thigh_L = self._seg_upright("sts3250_2", "knee_ankle_rotor_case_2")
+        shank_L = self._seg_upright("knee_ankle_rotor_case_2", "sts3250_3")
 
-        # Pitch alignment reward (only when head is high enough)
-        R_pitch = 1.0 * float(h_head > 0.3) * np.exp(-10.0 * pitch ** 2)
+        R_foot = 0.0
+        for i in range(self.data.ncon):
+            c = self.data.contact[i]
+            b1 = self.model.geom_bodyid[c.geom1]
+            b2 = self.model.geom_bodyid[c.geom2]
+            # print("b1: " + str(b1))
+            # print("b2: " + str(b2))
+            if WORLD_ID in (b1, b2):
+                if (RIGHT_FOOT_ID in (b1, b2) or LEFT_FOOT_ID in (b1, b2)) and h_head > h_foot:
+                    R_foot = np.exp(-10 * pow(self.foot_flatness("foot"), 2)) + np.exp(-10 * pow(thigh_R + shank_R + thigh_L + shank_L, 2)) 
+        
 
-        # Control effort reward (only once upright-ish)
-        delta_a = self.data.ctrl - self.previous_action
-        R_var = 0.05 * np.exp(-np.linalg.norm(delta_a)) if h_head > 0.35 else 0.0
-        self.previous_action = self.data.ctrl.copy()
+        R_up = np.exp(-10 * pow(abs(h_head - HEIGHT), 2))
+        R_pitch = np.exp(-10 * pow(uprightness, 2)) if h_head > 0.4 * HEIGHT else 0.0
+        # R_collision = 0.01 * np.exp(-self_collisions)
+        R_foot = np.exp(-10 * pow(abs(1 - self.foot_flatness("foot")), 2)) + 10 * (h_head - h_foot)
 
-        # Velocity reward (only if near standing)
-        R_vel = 0.05 * np.exp(-np.linalg.norm(self.data.qvel)) if h_head > 0.35 else 0.0
-
-        # Contact info
-        self_collisions = 0
-        contact_right = 0
-        contact_left = 0
-
-        try:
-            for i in range(self.data.ncon):
-                c = self.data.contact[i]
-                b1 = self.model.geom_bodyid[c.geom1]
-                b2 = self.model.geom_bodyid[c.geom2]
-
-                if b1 == b2 and b1 != 0:
-                    self_collisions += 1
-
-                if WORLD_ID in [b1, b2]:
-                    if RIGHT_FOOT_ID in [b1, b2]:
-                        contact_right = 1
-                    if LEFT_FOOT_ID in [b1, b2]:
-                        contact_left = 1
-        except Exception as e:
-            if self.debug:
-                print(f"[REWARD DEBUG] Contact processing error: {e}")
-
-        R_coll = 0.1 * np.exp(-self_collisions)
-        R_foot_contact = 0.1 * (contact_right + contact_left)
-
-        # Bonus for staying upright
-        bonus = 0.0
-        if h_head > 0.43 and abs(pitch) < 0.3:
-            bonus += 3.0
-            if self._standing_counter % int(1.0 / self.dt) == 0:
-                bonus += 3.0
-
-        # Mild penalty for being too low
-        penalty = -0.5 if h_head < 0.15 else 0.0
-
-        reward = (
-            R_up + R_pitch + R_vel + R_var + R_coll +
-            R_foot_contact + bonus + penalty
-        )
-
-        if self.debug:
-            print(f"[REWARD DEBUG] Head Height: {h_head:.3f}, Pitch: {pitch:.3f}")
-            print(f"[REWARD DEBUG] R_up: {R_up:.3f}, R_pitch: {R_pitch:.3f}, R_vel: {R_vel:.3f}, "
-                f"R_var: {R_var:.3f}, R_coll: {R_coll:.3f}, R_foot_contact: {R_foot_contact:.3f}")
-            print(f"[REWARD DEBUG] Bonus: {bonus:.3f}, Penalty: {penalty:.3f}, Total: {reward:.3f}")
-
+        reward = R_up + R_pitch + R_foot
         return reward
-
-
-
-
-
 
     def _is_done(self):
         self._step_counter += 1
@@ -130,7 +242,7 @@ class HumanoidGetupEnv(gym.Env):
         uprightness = self.data.xmat[1].reshape(3, 3)[:, 2] @ np.array([0, 0, 1])
         low_vel = np.linalg.norm(self.data.qvel[:3]) < 0.5
 
-        if h_head > 0.43 and uprightness > 0.9 and low_vel:
+        if h_head > 0.43 and uprightness > 0.9:
             self._standing_counter += 1
         else:
             self._standing_counter = 0
@@ -139,10 +251,43 @@ class HumanoidGetupEnv(gym.Env):
             return True
         if self._step_counter >= self._max_steps:
             return True
-        if np.any(np.abs(self.data.qvel) > 25.0):
-            return True
+        # if np.any(np.abs(self.data.qvel) > 25.0):
+        #     return True
         return False
 
+    # back down
+    # def reset(self, *, seed=None, options=None):
+    #     super().reset(seed=seed)
+
+    #     mujoco.mj_resetData(self.model, self.data)
+    #     self.data.time = 0.0
+
+    #     self._step_counter = 0
+    #     self._standing_counter = 0
+    #     self.previous_action = np.zeros(self.model.nu)
+
+    #     # ---- Pose: belly-down ----
+    #     self.data.qpos[0:2] = [0.0, 0.0]
+    #     self.data.qpos[2] = 0.08  # low height
+
+    #     # Pitch forward 90° to lie on stomach
+    #     angle = -np.pi / 2
+    #     quat = [np.cos(angle / 2), np.sin(angle / 2), 0, 0]  # pitch only
+    #     self.data.qpos[3:7] = quat
+
+    #     # Neutral joints
+    #     self.data.qpos[7:] = np.zeros(self.model.nq - 7)
+    #     self.data.qvel[:] = np.zeros(self.model.nv)
+
+    #     mujoco.mj_forward(self.model, self.data)
+
+    #     if self.render_mode and self.viewer is not None:
+    #         self.viewer.sync()
+
+    #     print("[ENV RESET] Humanoid reset to back-down position.")
+    #     return self._get_obs(), {}
+
+    # belly down
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
 
@@ -152,19 +297,61 @@ class HumanoidGetupEnv(gym.Env):
         self._step_counter = 0
         self._standing_counter = 0
         self.previous_action = np.zeros(self.model.nu)
+        mujoco.mj_forward(self.model, self.data)
+        self.best_height = float(self.data.xpos[21][2])  # head z at reset
+        self.no_progress_steps = 0
 
-        self.data.qpos[0:3] = np.random.uniform(-0.1, 0.1, size=3)
-        angle = np.random.uniform(-np.pi / 2, np.pi / 2)
+
+        # Set base position
+        self.data.qpos[0:2] = [0.0, 0.0]       # x, y position
+        self.data.qpos[2] = 0.0              # z height close to ground
+
+        # Pitch forward 90° = face/belly down
+        angle = np.pi / 2
         quat = [np.cos(angle / 2), np.sin(angle / 2), 0, 0]
         self.data.qpos[3:7] = quat
-        self.data.qpos[7:] = np.random.uniform(-1.0, 1.0, size=self.model.nq - 7)
-        self.data.qvel[:] = np.random.normal(0, 0.1, size=self.model.nv)
+
+        # Neutral limbs
+        self.data.qpos[7:] = np.zeros(self.model.nq - 7)
+        self.data.qvel[:] = np.zeros(self.model.nv)
 
         mujoco.mj_forward(self.model, self.data)
+
         if self.render_mode and self.viewer is not None:
             self.viewer.sync()
-        print("[ENV RESET] Resetting environment with new random pose.")
+
+        print("[ENV RESET] Humanoid reset belly-down (face-down).")
         return self._get_obs(), {}
+
+
+
+    # def reset(self, *, seed=None, options=None):
+    #     super().reset(seed=seed)
+
+    #     mujoco.mj_resetData(self.model, self.data)
+    #     self.data.time = 0.0
+
+    #     self._step_counter = 0
+    #     self._standing_counter = 0
+    #     self.previous_action = np.zeros(self.model.nu)
+
+    #     # ---- Pose: upright standing ----
+    #     self.data.qpos[0:2] = [0.0, 0.0]         # x, y base position
+    #     self.data.qpos[2] = .250                  # z: height above ground
+
+    #     self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]  # identity quaternion = upright
+
+    #     self.data.qpos[7:] = np.zeros(self.model.nq - 7)           # Neutral joints
+    #     self.data.qvel[:] = np.zeros(self.model.nv)                # No velocity
+
+    #     mujoco.mj_forward(self.model, self.data)
+
+    #     if self.render_mode and self.viewer is not None:
+    #         self.viewer.sync()
+
+    #     print("[ENV RESET] Humanoid reset upright (standing).")
+    #     return self._get_obs(), {}
+
 
     def step(self, action):
         action = np.clip(action, -1.0, 1.0)
@@ -199,7 +386,10 @@ class HumanoidGetupEnv(gym.Env):
         reward = self._get_reward()
         done = self._is_done()
         info = {
-            "is_success": bool(self._standing_counter >= self._standing_threshold)
+            "is_success": bool(self._standing_counter >= self._standing_threshold),
+            "standing_counter": self._standing_counter,
+            "head_height": self.data.xpos[21][2],
+            "pitch": np.arcsin(-self.data.xmat[1].reshape(3, 3)[:, 2] @ np.array([0, 0, 1]))
         }
 
         return obs, reward, done, False, info

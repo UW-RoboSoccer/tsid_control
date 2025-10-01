@@ -6,7 +6,7 @@ import time
 env = HumanoidGetupEnv(render_mode=True)
 
 # Load trained model (or comment this out to test random policy)
-model = PPO.load("models/ppo_humanoid_2000000_steps")
+model = PPO.load("models/ppo_humanoid_7000000_steps")
 
 obs, _ = env.reset()
 
@@ -25,3 +25,4 @@ for step in range(5000):  # ~10 seconds of sim
     if terminated or truncated:
         print("Episode ended. Resetting.")
         obs, _ = env.reset()
+
